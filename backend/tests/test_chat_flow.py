@@ -26,6 +26,7 @@ from app.services import llm_client, memory, rag, store, tts_client  # noqa: E40
 
 SOURCE = {"title": "示例_越王勾践剑", "content": "春秋晚期越国青铜剑"}
 EXPECTED_QUERY = "越王勾践剑是什么年代的？"
+USAGE = {"prompt_tokens": 321, "completion_tokens": 40, "total_tokens": 361}
 
 
 class _FakeUpload:
@@ -69,7 +70,7 @@ class ChatFlowTest(FlowTestCase):
             return [SOURCE]
 
         with mock.patch.object(rag, "retrieve", side_effect=fake_retrieve), \
-             mock.patch.object(llm_client, "chat_reply", return_value="春秋晚期。"):
+             mock.patch.object(llm_client, "chat_reply", return_value=("春秋晚期。", USAGE)):
             resp = chat(ChatRequest(question="它是什么年代的？", session_id=self.sid))
 
         self.assertEqual(seen, [EXPECTED_QUERY],
@@ -86,20 +87,19 @@ class ChatFlowTest(FlowTestCase):
             return [] if question == EXPECTED_QUERY else [SOURCE]
 
         with mock.patch.object(rag, "retrieve", side_effect=fake_retrieve), \
-             mock.patch.object(llm_client, "chat_reply", return_value="回答"):
+             mock.patch.object(llm_client, "chat_reply", return_value=("回答", USAGE)):
             chat(ChatRequest(question="它是什么年代的？", session_id=self.sid))
 
         self.assertEqual(seen, [EXPECTED_QUERY, "它是什么年代的？"])
 
     def test_model_gets_original_question_and_clean_history(self):
-        """模型看的是观众原话；history 里不能夹带 sources 等额外字段"""
+        """模型看的是观众原话；history 里不能夹带 sources / tokens 等额外字段"""
         captured = {}
 
-        def fake_reply(question, history, sources):
-            captured["question"] = question
-            captured["history"] = history
-            captured["sources"] = sources
-            return "春秋晚期。"
+        def fake_reply(question, history, sources, summary=""):
+            captured.update(question=question, history=history,
+                            sources=sources, summary=summary)
+            return "春秋晚期。", USAGE
 
         with mock.patch.object(rag, "retrieve", return_value=[SOURCE]), \
              mock.patch.object(llm_client, "chat_reply", side_effect=fake_reply):
@@ -114,7 +114,7 @@ class ChatFlowTest(FlowTestCase):
 
     def test_resolved_is_persisted_with_original_text(self):
         with mock.patch.object(rag, "retrieve", return_value=[SOURCE]), \
-             mock.patch.object(llm_client, "chat_reply", return_value="春秋晚期。"):
+             mock.patch.object(llm_client, "chat_reply", return_value=("春秋晚期。", USAGE)):
             chat(ChatRequest(question="它是什么年代的？", session_id=self.sid))
 
         msgs = store.fetch_messages(self.sid)
@@ -131,11 +131,11 @@ class ChatFlowTest(FlowTestCase):
             return [SOURCE]
 
         with mock.patch.object(rag, "retrieve", side_effect=fake_retrieve), \
-             mock.patch.object(llm_client, "chat_reply", return_value="春秋晚期。"):
+             mock.patch.object(llm_client, "chat_reply", return_value=("春秋晚期。", USAGE)):
             chat(ChatRequest(question="它是什么年代的？", session_id=self.sid))
 
         with mock.patch.object(rag, "retrieve", side_effect=fake_retrieve), \
-             mock.patch.object(llm_client, "chat_reply", return_value="二楼青铜展厅。"):
+             mock.patch.object(llm_client, "chat_reply", return_value=("二楼青铜展厅。", USAGE)):
             chat(ChatRequest(question="这个在哪个展厅？", session_id=self.sid))
 
         self.assertEqual(seen, ["越王勾践剑是什么年代的？", "越王勾践剑在哪个展厅？"])
@@ -148,10 +148,42 @@ class ChatFlowTest(FlowTestCase):
             return [SOURCE]
 
         with mock.patch.object(rag, "retrieve", side_effect=fake_retrieve), \
-             mock.patch.object(llm_client, "chat_reply", return_value="回答"):
+             mock.patch.object(llm_client, "chat_reply", return_value=("回答", USAGE)):
             chat(ChatRequest(question="青铜展厅怎么走？", session_id=self.sid))
 
         self.assertEqual(seen, ["青铜展厅怎么走？"])
+
+
+class CompactionWiringTest(FlowTestCase):
+    """滚动摘要接进流程：每轮先检查压缩，并把摘要交给模型"""
+
+    def test_maybe_compact_is_called_every_turn(self):
+        with mock.patch.object(memory, "maybe_compact", return_value={"compacted": False}) as compact, \
+             mock.patch.object(rag, "retrieve", return_value=[SOURCE]), \
+             mock.patch.object(llm_client, "chat_reply", return_value=("回答", USAGE)):
+            chat(ChatRequest(question="它是什么年代的？", session_id=self.sid))
+        compact.assert_called_once_with(self.sid)
+
+    def test_summary_is_passed_to_model(self):
+        captured = {}
+
+        def fake_reply(question, history, sources, summary=""):
+            captured["summary"] = summary
+            return "回答", USAGE
+
+        store.set_summary(self.sid, "更早的对话摘要", 0)
+        with mock.patch.object(rag, "retrieve", return_value=[SOURCE]), \
+             mock.patch.object(llm_client, "chat_reply", side_effect=fake_reply):
+            chat(ChatRequest(question="它是什么年代的？", session_id=self.sid))
+
+        self.assertEqual(captured["summary"], "更早的对话摘要")
+
+    def test_usage_recorded_for_safety_valve(self):
+        with mock.patch.object(rag, "retrieve", return_value=[SOURCE]), \
+             mock.patch.object(llm_client, "chat_reply", return_value=("回答", USAGE)):
+            chat(ChatRequest(question="它是什么年代的？", session_id=self.sid))
+        self.assertEqual(store.get_session(self.sid)["last_prompt_tokens"],
+                         USAGE["prompt_tokens"])
 
 
 class VoiceFlowTest(FlowTestCase):
@@ -166,7 +198,7 @@ class VoiceFlowTest(FlowTestCase):
 
         with mock.patch.object(llm_client, "transcribe", return_value="他是什么年代的？"), \
              mock.patch.object(rag, "retrieve", side_effect=fake_retrieve), \
-             mock.patch.object(llm_client, "chat_reply", return_value="春秋晚期。"), \
+             mock.patch.object(llm_client, "chat_reply", return_value=("春秋晚期。", USAGE)), \
              mock.patch.object(tts_client, "synthesize", return_value=b"RIFFfake"):
             resp = asyncio.run(voice(audio=_FakeUpload(b"RIFFfakewav"), session_id=self.sid))
 
@@ -174,6 +206,15 @@ class VoiceFlowTest(FlowTestCase):
         self.assertEqual(resp.question, "他是什么年代的？", "返回给界面的应是识别原文")
         self.assertEqual(resp.sources, ["示例_越王勾践剑"])
         self.assertTrue(resp.audio_base64)
+
+    def test_voice_records_usage(self):
+        with mock.patch.object(llm_client, "transcribe", return_value="开放时间？"), \
+             mock.patch.object(rag, "retrieve", return_value=[]), \
+             mock.patch.object(llm_client, "chat_reply", return_value=("回答", USAGE)), \
+             mock.patch.object(tts_client, "synthesize", return_value=b"RIFF"):
+            asyncio.run(voice(audio=_FakeUpload(b"RIFF"), session_id=self.sid))
+        self.assertEqual(store.get_session(self.sid)["last_prompt_tokens"],
+                         USAGE["prompt_tokens"])
 
     def test_voice_rejects_empty_audio(self):
         from fastapi import HTTPException

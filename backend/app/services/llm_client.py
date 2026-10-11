@@ -61,6 +61,8 @@ def chat_reply(question: str, history: list, sources: list) -> str:
         )
 
     messages = [{"role": "system", "content": system}]
-    messages += history[-10:]  # 只带最近10轮，防止太长
+    # 窗口截取已由 memory 按"轮"对齐完成，这里不再二次截断：
+    # 原来那句 history[-10:] 会把一轮问答从中间切开，让模型看到没有提问的回答。
+    messages += history
     messages.append({"role": "user", "content": question})
     return _chat(messages, config.MIMO_TEXT_MODEL)

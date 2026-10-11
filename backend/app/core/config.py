@@ -43,6 +43,23 @@ PORT = 8000
 KNOWLEDGE_BASE_DIR = BASE_DIR / "knowledge_base"
 TOP_K = 3
 
+# —— 会话持久化与上下文窗口（角色 D 用）——
+# 数据库落在 backend/data/chat.db，已在根 .gitignore 中排除，不会进仓库。
+# 通过环境变量 CHAT_DB_PATH 可覆盖（单元测试用它指到临时文件）。
+DATA_DIR = BASE_DIR / "data"
+DB_PATH = Path(os.environ.get("CHAT_DB_PATH", DATA_DIR / "chat.db"))
+
+# 送入模型的最近轮数（1 轮 = 1 问 + 1 答）
+RECENT_TURNS = 6
+
+# 长对话摘要：消息条数超过该阈值时压缩一次（阶段四启用）
+SUMMARY_TRIGGER = 24
+SUMMARY_KEEP_TAIL = 12
+
+# 会话治理
+MAX_MSG_PER_SESSION = 500
+SESSION_TTL_DAYS = 7
+
 # —— 讲解员人设（System Prompt）——
 SYSTEM_PROMPT = (
     "你是一位专业、亲切的历史博物馆讲解员。"

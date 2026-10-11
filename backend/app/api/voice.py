@@ -2,20 +2,22 @@
 #
 # POST /api/voice
 #   请求：multipart/form-data，字段 audio=录音文件(WAV)、session_id=会话编号
-#   响应：{ answer, sources, audio_base64 }
+#   响应：{ question, answer, sources, audio_base64 }
 #
-# 处理流程（语音闭环的服务端部分）：
+# 处理流程（语音闭环的服务端部分，顺序与 /api/chat 保持一致）：
 #   1. 录音 → mimo-v2.5-asr 听懂 → 问题文本
-#   2. 问题 + 历史 + RAG 资料 → mimo 生成回答
-#   3. 回答 → mimo-v2.5-tts 变成语音（base64 返回）
-#   4. 问答双方记入对话历史
+#   2. 取上下文 + 指代消解（语音场景尤其重要：ASR 常把"它"写成同音字"他/她"）
+#   3. 用消解后的问句检索资料
+#   4. 资料 + 历史 + 问题 → mimo 生成回答
+#   5. 回答 → mimo-v2.5-tts 变成语音（base64 返回）
+#   6. 问答双方记入对话历史
 
 import base64
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ..schemas.chat import VoiceResponse
-from ..services import llm_client, memory, rag, tts_client
+from ..services import coreference, llm_client, memory, rag, tts_client
 
 router = APIRouter()
 
@@ -28,14 +30,22 @@ async def voice(audio: UploadFile = File(...), session_id: str = Form(...)):
 
     try:
         question = llm_client.transcribe(wav_bytes)          # 1. 听懂提问
-        sources = rag.retrieve(question)                      # 2. 检索资料
-        history = memory.recall(session_id)
-        answer = llm_client.chat_reply(question, history, sources)
-        audio_b64 = base64.b64encode(tts_client.synthesize(answer)).decode()  # 3. 生成播报语音
+        ctx = memory.get_context(session_id)                 # 2. 取上下文
+        resolved, info = coreference.resolve(                #    指代消解
+            question, ctx["history"], sources=ctx["recent_sources"]
+        )
+        query = resolved if info["changed"] else question    # 3. 检索
+        sources = rag.retrieve(query)
+        if not sources and query != question:
+            sources = rag.retrieve(question)
+        answer = llm_client.chat_reply(question, ctx["history"], sources)   # 4. 生成回答
+        audio_b64 = base64.b64encode(tts_client.synthesize(answer)).decode()  # 5. 生成播报语音
     except Exception as exc:
         raise HTTPException(status_code=502, detail={"error": str(exc), "hint": "AI 服务暂时不可用，请稍后再试"})
 
-    memory.remember(session_id, "user", question)             # 4. 记入历史（记识别出的文字）
-    memory.remember(session_id, "assistant", answer)
+    # 6. 记入历史（记识别出的文字；用户消息同时保存消解结果）
+    memory.remember(session_id, "user", question, resolved=resolved)
+    memory.remember(session_id, "assistant", answer,
+                    sources=[s["title"] for s in sources])
     return VoiceResponse(question=question, answer=answer,
                          sources=[s["title"] for s in sources], audio_base64=audio_b64)

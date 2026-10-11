@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 对话列表里的单条消息：一个气泡 + 下方的资料来源小字（AI 回答才有） -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/layout_bubble_item"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <!-- 气泡文字（用户靠右深色、AI 靠左浅色，在代码里设置） -->
+    <TextView
+        android:id="@+id/text_bubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:maxWidth="280dp"
+        android:padding="12dp"
+        android:textSize="15sp"
+        tools:text="你好，我是博物馆讲解员" />
+
+    <!-- 资料来源小字（默认隐藏，AI 回答带来源时显示） -->
+    <TextView
+        android:id="@+id/text_sources"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textSize="11sp"
+        android:visibility="gone"
+        tools:text="来源：青铜器图录"
+        tools:visibility="visible" />
+
+</LinearLayout>

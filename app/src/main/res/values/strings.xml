@@ -1,4 +1,21 @@
 <resources>
     <string name="app_name">MuseumDocentAI</string>
-    <string name="hello_world">Hello World!</string>
+
+    <!-- ====== 界面文字（角色 A） ====== -->
+    <string name="hint_question">输入你的问题…</string>
+    <string name="btn_send">发送</string>
+    <string name="btn_record">语音</string>
+    <string name="btn_record_stop">停止</string>
+    <string name="status_thinking">思考中…</string>
+    <string name="status_recording">正在录音…点击停止</string>
+    <string name="source_label">来源：%1$s</string>
+    <string name="voice_message_label">🎤 语音提问</string>
+
+    <!-- ====== 提示信息（Toast / 错误气泡） ====== -->
+    <string name="toast_permission_denied">需要麦克风权限才能语音提问</string>
+    <string name="toast_record_too_short">说话时间太短，请重试</string>
+    <string name="toast_record_failed">录音失败，请重试</string>
+    <string name="toast_play_failed">语音播放失败</string>
+    <string name="err_network">网络连接失败，请检查网络</string>
+    <string name="err_server">服务返回数据异常</string>
 </resources>

@@ -15,23 +15,30 @@ from ..core import config
 
 
 def retrieve(question: str) -> list:
-    """检索与问题相关的资料片段（占位：关键词匹配）"""
+    """检索与问题相关的资料片段（占位：2~3 字滑窗关键词匹配）"""
     results = []
     kb_dir = Path(config.KNOWLEDGE_BASE_DIR)
     if not kb_dir.exists():
         return results
 
-    # 把问题里的词拆出来当关键词（很粗暴，够联调用）
-    words = [w for w in re.findall(r"[\u4e00-\u9fff]{2,}|[A-Za-z0-9]+", question) if w]
+    # 把问题切成 2~3 字的小词片（"越王勾践剑是什么" -> 越王/王勾/勾践/...）
+    words = set()
+    for run in re.findall(r"[\u4e00-\u9fff]+", question):
+        for n in (2, 3):
+            words.update(run[i: i + n] for i in range(len(run) - n + 1))
+    words.update(re.findall(r"[A-Za-z0-9]{2,}", question))
+    if not words:
+        return results
+
     for path in sorted(kb_dir.glob("**/*")):
         if path.suffix.lower() not in (".md", ".txt") or path.name.upper() == "README.MD":
             continue
         text = path.read_text(encoding="utf-8", errors="ignore").strip()
         if not text:
             continue
-        # 命中任意关键词就收录（按命中数排序）
+        # 命中的词片越多越相关（命中数太少的不算）
         hits = sum(1 for w in words if w in text or w in path.stem)
-        if hits > 0:
+        if hits >= 2:
             results.append({"title": path.stem, "content": text[:500], "_hits": hits})
 
     results.sort(key=lambda r: r["_hits"], reverse=True)

@@ -24,6 +24,10 @@ backend/.env
 # 本地临时工具（不提交）
 .tools/
 pypdf_lib/
+*.wav
+
+# Python 后端的本地虚拟环境
+backend/.venv/
 
 # 向量库等大文件（角色C 构建后按需放开注释）
 # backend/knowledge_base/vector_db/

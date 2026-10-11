@@ -49,14 +49,21 @@ TOP_K = 3
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = Path(os.environ.get("CHAT_DB_PATH", DATA_DIR / "chat.db"))
 
-# 送入模型的最近轮数（1 轮 = 1 问 + 1 答）
-RECENT_TURNS = 6
+# —— 上下文窗口与长对话摘要（按 token 预算，而不是消息条数）——
+# 为什么用 token 而不是条数：一条 500 字的资料和一句"嗯"都算一条消息，
+# 按条数切窗口完全不准；而 token 才是真正的资源约束（成本和上下文上限）。
+#
+# 这里不需要分词器：
+#   1. mimo 接口在 usage 里返回真实用量，安全阀直接用服务端数字；
+#   2. 中文经验值 1 个汉字 ≈ 1 个 token（实测 13 字 → 15 prompt_token，含模板开销），
+#      估算只用于"何时压缩"，宁可略大（早压缩是安全方向）。
+#   tiktoken 是 OpenAI 的词表，对 mimo 本来就不准，还要加依赖，不用。
+RECENT_TOKEN_BUDGET = 1200     # 最近多少 token 的对话原样喂给模型
+SUMMARY_TRIGGER_TOKENS = 2400  # 滑出窗口且未被摘要覆盖的部分累积超过此值才压缩一次
+SUMMARY_MAX_CHARS = 400        # 摘要文本长度上限（它也要占 prompt 预算）
+PROMPT_TOKEN_ALERT = 6000      # 整个提示词超过此值就告警：说明光压历史已不够用
 
-# 长对话摘要：消息条数超过该阈值时压缩一次（阶段四启用）
-SUMMARY_TRIGGER = 24
-SUMMARY_KEEP_TAIL = 12
-
-# 会话治理
+# —— 会话治理 ——
 MAX_MSG_PER_SESSION = 500
 SESSION_TTL_DAYS = 7
 

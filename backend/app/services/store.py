@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     updated_at   TEXT NOT NULL,
     summary      TEXT NOT NULL DEFAULT '',
     summary_upto INTEGER NOT NULL DEFAULT 0,
-    title        TEXT NOT NULL DEFAULT ''
+    title        TEXT NOT NULL DEFAULT '',
+    last_prompt_tokens INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -36,11 +37,19 @@ CREATE TABLE IF NOT EXISTS messages (
     content     TEXT NOT NULL,
     resolved    TEXT NOT NULL DEFAULT '',
     sources     TEXT NOT NULL DEFAULT '[]',
+    tokens      INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_msg_session ON messages(session_id, id);
 """
+
+# 增量迁移：老库缺的列在这里补上，保证升级后不用删库重建
+# (表名, 列名, 列定义)
+_MIGRATIONS = (
+    ("sessions", "last_prompt_tokens", "INTEGER NOT NULL DEFAULT 0"),
+    ("messages", "tokens", "INTEGER NOT NULL DEFAULT 0"),
+)
 
 # 建表只做一次（进程内）。加锁是因为 FastAPI 的同步接口跑在线程池里，
 # 首次并发请求会同时进来。
@@ -51,6 +60,37 @@ _schema_lock = threading.Lock()
 def _now() -> str:
     """统一用 UTC 的 ISO8601 存时间，避免服务器时区变化影响过期判断"""
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def estimate_tokens(text: str) -> int:
+    """估算文本占多少 token。
+
+    中文经验值 1 个汉字 ≈ 1 个 token（实测："你好，请只回复两个字：收到" 13 字
+    → 服务端 prompt_tokens = 15，多出来的 2 个是 chat 模板的包装开销）。
+    英文会低估吗？不会——英文约 4 字符/token，这里按 1 字符/token 算是**高估**，
+    方向是安全的（无非早一点触发压缩）。
+
+    这个估算只用于决定"何时压缩"；真实用量以服务端返回的 usage 为准。
+    """
+    if not text:
+        return 0
+    return len(text) + 4          # +4 约等于 role / 分隔符的固定开销
+
+
+def _migrate(conn):
+    """补齐老库缺失的列，让升级不必删库"""
+    added = []
+    for table, column, decl in _MIGRATIONS:
+        cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+            added.append((table, column))
+
+    # 刚加上 tokens 列时给老数据回填估算值。
+    # 必须回填：全 0 会让"累计 token ≤ 预算"的窗口查询变成无界（0 永远不超预算）。
+    if ("messages", "tokens") in added:
+        conn.execute("UPDATE messages SET tokens = length(content) + 4 WHERE content <> ''")
+        conn.commit()
 
 
 @contextmanager
@@ -72,6 +112,7 @@ def _connect():
             with _schema_lock:
                 if not _schema_ready:
                     conn.executescript(_SCHEMA)
+                    _migrate(conn)
                     conn.commit()
                     _schema_ready = True
         yield conn
@@ -178,26 +219,30 @@ def purge_expired(days: int | None = None) -> int:
 # ======== 消息 ========
 
 def append_message(session_id: str, role: str, content: str,
-                   resolved: str = "", sources: list | None = None) -> int:
+                   resolved: str = "", sources: list | None = None,
+                   tokens: int | None = None) -> int:
     """追加一条消息，返回它的自增 id。
 
-    content ：用户原话，保真存储（展示、摘要、日志都用它）
+    content ：用户原话 / 模型回答，保真存储（展示、摘要、日志都用它）
     resolved：指代消解后的独立问句，仅用于检索，不影响展示
     sources ：该轮回答引用的资料标题列表，落库供历史回放排查
+    tokens  ：这条消息占多少 token（不传则按 content 估算），窗口和压缩都靠它
 
     三条语句在同一个事务里提交，避免会话建了但消息没落、或者消息落了时间没更新。
     """
     now = _now()
     payload = json.dumps(sources or [], ensure_ascii=False)
+    if tokens is None:
+        tokens = estimate_tokens(content)
     with _connect() as conn:
         conn.execute(
             "INSERT OR IGNORE INTO sessions (session_id, created_at, updated_at) VALUES (?, ?, ?)",
             (session_id, now, now),
         )
         cur = conn.execute(
-            "INSERT INTO messages (session_id, role, content, resolved, sources, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (session_id, role, content, resolved, payload, now),
+            "INSERT INTO messages (session_id, role, content, resolved, sources, tokens, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (session_id, role, content, resolved, payload, tokens, now),
         )
         conn.execute("UPDATE sessions SET updated_at = ? WHERE session_id = ?", (now, session_id))
         conn.commit()
@@ -232,6 +277,72 @@ def count_messages(session_id: str) -> int:
         return int(row["n"])
 
 
+def fetch_tail_by_tokens(session_id: str, token_budget: int) -> list:
+    """从最新一条往回取，直到累计 token 不超过预算；返回正序列表。
+
+    用 SQL 窗口函数在库里累加，避免为了找窗口边界把整个会话读进内存。
+    注意这是"尽量装满预算"，不保证正好卡在预算上——边界未必落在轮的分界，
+    按轮对齐由 memory 层负责。
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM ("
+            "  SELECT *, SUM(tokens) OVER (ORDER BY id DESC "
+            "      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS _cum "
+            "  FROM messages WHERE session_id = ?"
+            ") WHERE _cum <= ? ORDER BY id",
+            (session_id, max(int(token_budget), 0)),
+        ).fetchall()
+    return [_to_message(r) for r in rows]
+
+
+def fetch_between(session_id: str, after_id: int = 0, before_id: int | None = None) -> list:
+    """取 id 落在 (after_id, before_id) 区间内的消息，正序。
+
+    用来挑出"已滑出窗口、且还没被摘要覆盖"的那批，交给摘要压缩。
+    before_id 传 None 表示不限上界。
+    """
+    sql = "SELECT * FROM messages WHERE session_id = ? AND id > ?"
+    params = [session_id, after_id]
+    if before_id:
+        sql += " AND id < ?"
+        params.append(before_id)
+    sql += " ORDER BY id"
+    with _connect() as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return [_to_message(r) for r in rows]
+
+
+def fetch_previous(session_id: str, before_id: int) -> dict | None:
+    """取紧邻 before_id 之前的那一条消息（窗口往前补一轮时用）"""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM messages WHERE session_id = ? AND id < ? ORDER BY id DESC LIMIT 1",
+            (session_id, before_id),
+        ).fetchone()
+    return _to_message(row) if row else None
+
+
+def sum_tokens(session_id: str, after_id: int = 0, before_id: int | None = None) -> int:
+    """统计某区间消息的 token 总和（决定要不要压缩）"""
+    sql = "SELECT COALESCE(SUM(tokens), 0) AS n FROM messages WHERE session_id = ? AND id > ?"
+    params = [session_id, after_id]
+    if before_id:
+        sql += " AND id < ?"
+        params.append(before_id)
+    with _connect() as conn:
+        row = conn.execute(sql, params).fetchone()
+        return int(row["n"])
+
+
+def set_last_prompt_tokens(session_id: str, tokens: int):
+    """记下最近一次请求的真实 prompt token 数（来自服务端 usage）"""
+    with _connect() as conn:
+        conn.execute("UPDATE sessions SET last_prompt_tokens = ? WHERE session_id = ?",
+                     (int(tokens), session_id))
+        conn.commit()
+
+
 def _to_message(row: sqlite3.Row) -> dict:
     """数据库行 → 字典（sources 从 JSON 字符串还原成列表）"""
     try:
@@ -244,5 +355,6 @@ def _to_message(row: sqlite3.Row) -> dict:
         "content": row["content"],
         "resolved": row["resolved"],
         "sources": sources,
+        "tokens": row["tokens"],
         "created_at": row["created_at"],
     }

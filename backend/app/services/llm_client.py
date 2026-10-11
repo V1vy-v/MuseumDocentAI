@@ -6,6 +6,13 @@
 #   语音识别：POST /chat/completions，用户消息里带 input_audio（base64 WAV）
 #   语音合成：POST /chat/completions，messages 里含 assistant 角色的文本，
 #             回复的 message.audio.data 里是 base64 音频
+#
+# 实测要点（写代码时别踩）：
+#   1. 响应里带 usage，字段为 prompt_tokens / completion_tokens / total_tokens。
+#      所以判断"上下文有多大"不需要自己分词，直接用服务端数字。
+#   2. 这个模型会烧 reasoning token：让它回两个字，completion_tokens 是 19，
+#      其中 16 个是思考。思考内容在 message.reasoning_content 里。
+#      对语音这种延迟敏感的场景，这个开销要心里有数。
 
 import base64
 
@@ -20,8 +27,8 @@ def _headers():
     return {"Authorization": "Bearer " + config.MIMO_API_KEY, "Content-Type": "application/json"}
 
 
-def _chat(messages, model):
-    """统一的调用入口：失败抛异常，成功返回回答文字"""
+def _chat_raw(messages, model) -> dict:
+    """统一的调用入口：失败抛异常，成功返回整个响应体（含 usage）"""
     resp = requests.post(
         config.MIMO_API_URL + "/chat/completions",
         headers=_headers(),
@@ -29,7 +36,16 @@ def _chat(messages, model):
         timeout=_TIMEOUT,
     )
     resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"].strip()
+    return resp.json()
+
+
+def _content(data: dict) -> str:
+    return (data["choices"][0]["message"].get("content") or "").strip()
+
+
+def _usage(data: dict) -> dict:
+    """取服务端返回的用量；老接口没有这个字段时返回空字典"""
+    return data.get("usage") or {}
 
 
 def transcribe(wav_bytes: bytes) -> str:
@@ -41,16 +57,26 @@ def transcribe(wav_bytes: bytes) -> str:
             "input_audio": {"data": base64.b64encode(wav_bytes).decode(), "format": "wav"},
         }],
     }
-    return _chat([payload_user], config.MIMO_ASR_MODEL)
+    return _content(_chat_raw([payload_user], config.MIMO_ASR_MODEL))
 
 
-def chat_reply(question: str, history: list, sources: list) -> str:
-    """文本回答：问题 + 对话历史 + 检索资料 → 讲解员式回答
+def chat_reply(question: str, history: list, sources: list, summary: str = "") -> tuple:
+    """文本回答：问题 + 历史摘要 + 对话历史 + 检索资料 → 讲解员式回答
 
-    history: [{"role": "user"/"assistant", "content": "..."}]（由 memory 提供）
-    sources: rag.retrieve() 返回的资料片段 [{"title","content"}]
+    参数：
+        question：观众本轮原话（不要传指代消解改写过的，模型要看到原话）
+        history ：[{"role","content"}]，最近若干轮，已按轮对齐
+        sources ：rag.retrieve() 返回的资料片段 [{"title","content"}]
+        summary ：更早对话的压缩摘要，空串表示还没有
+
+    返回：(回答文本, 用量字典)。用量来自服务端，用于安全阀和排查。
     """
     system = config.SYSTEM_PROMPT
+
+    # 更早的对话已经被压缩成摘要，放在人设之后、资料之前
+    if summary:
+        system += "\n\n以下是本次对话更早部分的摘要，供你理解上下文：\n" + summary
+
     if sources:
         material = "\n".join(f"《{s['title']}》：{s['content']}" for s in sources)
         system += "\n\n请参考以下馆内资料回答，不要编造资料里没有的内容：\n" + material
@@ -65,4 +91,36 @@ def chat_reply(question: str, history: list, sources: list) -> str:
     # 原来那句 history[-10:] 会把一轮问答从中间切开，让模型看到没有提问的回答。
     messages += history
     messages.append({"role": "user", "content": question})
-    return _chat(messages, config.MIMO_TEXT_MODEL)
+
+    data = _chat_raw(messages, config.MIMO_TEXT_MODEL)
+    return _content(data), _usage(data)
+
+
+def summarize(old_summary: str, turns: list) -> str:
+    """把较早的一批对话压成一段摘要（长对话滚动摘要用）。
+
+    old_summary 非空表示这是"合并"：在上一次摘要的基础上并入新对话，
+    而不是重头总结。这样每次只处理新增的一小段，省 token 也更稳定。
+
+    turns：[{"role","content"}]，已滑出上下文窗口、且还没被摘要覆盖的那批。
+    """
+    lines = []
+    for msg in turns:
+        who = "观众" if msg.get("role") == "user" else "讲解员"
+        lines.append(f"{who}：{msg.get('content', '')}")
+
+    parts = [
+        "你在为一段博物馆导览对话做压缩存档，把下面的对话压成一段简短摘要。",
+        "必须保留：观众问过哪几件文物、问过哪些具体问题、"
+        "以及关键的事实结论（年代、出土地、展厅位置）。",
+        f"用一段连续的话，不超过 {config.SUMMARY_MAX_CHARS} 字，"
+        "不要列表、不要标题、不要 Markdown 符号。",
+    ]
+    if old_summary:
+        parts.append("这是已有摘要（它覆盖了更早的对话），请把新对话合并进去，"
+                     "输出完整的合并结果：\n" + old_summary)
+    parts.append("需要并入的新对话：\n" + "\n".join(lines))
+
+    data = _chat_raw([{"role": "user", "content": "\n\n".join(parts)}],
+                     config.MIMO_TEXT_MODEL)
+    return _content(data)

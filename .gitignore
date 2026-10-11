@@ -21,6 +21,15 @@ __pycache__/
 venv/
 backend/.env
 
+# 会话数据库（本地数据，不入库）—— 首次生成 backend/data/chat.db 前必须生效
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+
+# 测试缓存
+backend/.pytest_cache/
+
 # 本地临时工具（不提交）
 .tools/
 pypdf_lib/

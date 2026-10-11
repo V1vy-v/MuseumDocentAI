@@ -2,11 +2,12 @@
 fastapi
 uvicorn
 requests
+python-multipart      # 语音接口上传录音文件用
 
 # —— RAG 相关（角色 C 需要时再装）——
 # faiss-cpu
 # sentence-transformers
 # chromadb
 
-# —— 语音合成（若 mimo-v2.5-asr 不支持语音输出，选一种 TTS 再装）——
-# edge-tts
+# —— 语音合成 ——
+# 不需要另装：语音输出用同平台的 mimo-v2.5-tts（已实测可用）

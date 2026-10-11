@@ -1,0 +1,29 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Python 后端
+__pycache__/
+*.pyc
+.venv/
+venv/
+backend/.env
+
+# 本地临时工具（不提交）
+.tools/
+pypdf_lib/
+
+# 向量库等大文件（角色C 构建后按需放开注释）
+# backend/knowledge_base/vector_db/

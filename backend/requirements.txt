@@ -1,0 +1,12 @@
+# 后端依赖清单（按需取消注释）
+fastapi
+uvicorn
+requests
+
+# —— RAG 相关（角色 C 需要时再装）——
+# faiss-cpu
+# sentence-transformers
+# chromadb
+
+# —— 语音合成（若 mimo-v2.5-asr 不支持语音输出，选一种 TTS 再装）——
+# edge-tts

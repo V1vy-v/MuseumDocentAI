@@ -14,30 +14,23 @@
 # 必然命中为空，模型会回答「馆内资料暂未收录」——上一轮刚讲过，观众却觉得机器人失忆。
 
 import base64
-import json
 import os
 import sys
 import tempfile
-import urllib.request
 import uuid
 from pathlib import Path
 
 import requests
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-BACKEND = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000")
+from app.core import config  # noqa: E402  模型配置的唯一来源
 
-# 读取模型配置（造测试语音用）
-env = {}
-env_path = Path(__file__).resolve().parents[1] / ".env"
-if env_path.exists():
-    for line in env_path.read_text(encoding="ascii", errors="ignore").splitlines():
-        if "=" in line:
-            k, v = line.strip().split("=", 1)
-            env[k] = v
-MIMO_API_URL = env.get("MIMO_API_URL", "")
-MIMO_KEY = env.get("XIAOMI_API_KEY", "")
+# 原来这里自己解析 .env，但 .env 里并没有 MIMO_API_URL，
+# 于是 MIMO_API_URL 取到空串，语音那步会 POST 到 "/chat/completions" 直接失败。
+# 改成复用 app.core.config，顺带去掉那段 ascii 解码（会静默丢掉非 ASCII 字符）。
+BACKEND = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000")
 
 
 def step1_health():
@@ -78,10 +71,13 @@ def step3_multiturn(session_id):
 
 
 def step4_voice():
+    if not config.MIMO_API_KEY:
+        raise AssertionError("backend/.env 里没有配置 XIAOMI_API_KEY，无法生成测试语音")
+
     # 4a. 用 TTS 造一句提问语音（模拟观众说话）
-    r = requests.post(MIMO_API_URL + "/chat/completions",
-                      headers={"Authorization": "Bearer " + MIMO_KEY},
-                      json={"model": "mimo-v2.5-tts",
+    r = requests.post(config.MIMO_API_URL + "/chat/completions",
+                      headers={"Authorization": "Bearer " + config.MIMO_API_KEY},
+                      json={"model": config.MIMO_TTS_MODEL,
                             "messages": [{"role": "assistant", "content": "你好，请问博物馆今天开放吗？"}]},
                       timeout=90)
     r.raise_for_status()

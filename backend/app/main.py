@@ -18,7 +18,9 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .api import chat, sessions, voice
 from .core import config
@@ -39,6 +41,27 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="博物馆导览问答机器人 后端", lifespan=lifespan)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def flatten_http_error(request: Request, exc: StarletteHTTPException):
+    """把错误体摊平成前端约定的 {"error", "hint"} 格式。
+
+    背景：FastAPI 的 HTTPException(detail={...}) 会自动再包一层 detail，
+    实际返回 {"detail": {"error": "...", "hint": "..."}}；
+    但前端 ApiClient.handleResponse 是按平铺解析的（json.has("error")），
+    schemas/chat.py 的 ErrorResponse 也声明成平铺——三方不一致，错的是后端。
+
+    不摊平的后果：模型调用失败返回 502 时，前端判定为"成功但 answer 为空"，
+    界面上出现一个空气泡，而不是"AI 服务暂时不可用，请稍后再试"。
+    """
+    detail = exc.detail
+    if isinstance(detail, dict) and "error" in detail:
+        content = detail                    # 已经是约定格式，直接摊平
+    else:
+        content = {"detail": detail}        # 其它情况保持 FastAPI 默认形状
+    return JSONResponse(status_code=exc.status_code, content=content,
+                        headers=getattr(exc, "headers", None))
 
 app.include_router(chat.router)
 app.include_router(voice.router)

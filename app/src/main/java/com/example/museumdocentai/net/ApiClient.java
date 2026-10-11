@@ -38,11 +38,20 @@ import java.util.concurrent.Executors;
 public class ApiClient implements ChatApi {
 
     /**
-     * 后端服务基地址：
-     * - 模拟器访问电脑上的后端：http://10.0.2.2:8000（10.0.2.2 是模拟器里的"电脑"）
-     * - 真机调试：改成电脑的局域网 IP，例如 http://192.168.1.10:8000
+     * 后端服务基地址候选（按顺序尝试，连上哪个用哪个，之后固定用它）：
+     * 1. http://10.0.2.2:8000  —— 模拟器默认（10.0.2.2 是模拟器里的"电脑"）
+     * 2. http://127.0.0.1:8000 —— 配合 adb reverse 端口转发使用
+     *    （电脑开了 Clash 等代理软件时 10.0.2.2 会被拦，用这个地址最稳；
+     *      先在电脑上执行一次：adb reverse tcp:8000 tcp:8000）
+     * 3. 真机调试：把电脑局域网 IP 加进来，例如 http://192.168.1.10:8000
      */
-    private static final String BASE_URL = "http://10.0.2.2:8000";
+    private static final String[] BASE_URLS = {
+            "http://10.0.2.2:8000",
+            "http://127.0.0.1:8000",
+    };
+
+    /** 记住第一个连通的地址，后续请求直接用它 */
+    private static volatile String workingBaseUrl = null;
 
     /** 超时时间：连不上 10 秒算失败；等待回答最长 60 秒 */
     private static final int CONNECT_TIMEOUT_MS = 10000;
@@ -96,17 +105,46 @@ public class ApiClient implements ChatApi {
     // ======== 请求的发送细节 ========
 
     /** 打开一个到后端的连接（统一设置超时） */
-    private HttpURLConnection openConnection(String path) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) new URL(BASE_URL + path).openConnection();
+    private HttpURLConnection openConnection(String baseUrl, String path) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + path).openConnection();
         connection.setRequestMethod("POST");
         connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
         connection.setReadTimeout(READ_TIMEOUT_MS);
         return connection;
     }
 
-    /** 发送普通 JSON 请求，返回后端的原始应答文本 */
+    /** 候选地址列表：已经连通过的排最前 */
+    private static List<String> baseUrlsToTry() {
+        List<String> list = new ArrayList<>();
+        String working = workingBaseUrl;
+        if (working != null) {
+            list.add(working);
+        }
+        for (String base : BASE_URLS) {
+            if (!base.equals(working)) {
+                list.add(base);
+            }
+        }
+        return list;
+    }
+
+    /** 发送普通 JSON 请求，返回后端的原始应答文本（连不上会自动换下一个地址重试） */
     private String postJson(String path, String jsonBody) throws IOException {
-        HttpURLConnection connection = openConnection(path);
+        IOException lastError = null;
+        for (String base : baseUrlsToTry()) {
+            try {
+                String result = postJsonOnce(base, path, jsonBody);
+                workingBaseUrl = base;
+                return result;
+            } catch (IOException e) {
+                lastError = e;
+            }
+        }
+        throw lastError;
+    }
+
+    private String postJsonOnce(String baseUrl, String path, String jsonBody) throws IOException {
+        HttpURLConnection connection = openConnection(baseUrl, path);
         try {
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             connection.setDoOutput(true);
@@ -120,12 +158,26 @@ public class ApiClient implements ChatApi {
     }
 
     /**
-     * 发送 multipart/form-data 请求（上传录音文件用）。
+     * 发送 multipart/form-data 请求（上传录音文件用），连不上会自动换地址重试。
      * 格式说明：请求体由若干"部分"组成，每部分用分隔线隔开；
      * 这里放两个部分——文本字段 session_id、文件字段 audio。
      */
     private String postMultipart(String path, File audioFile, String sessionId) throws IOException {
-        HttpURLConnection connection = openConnection(path);
+        IOException lastError = null;
+        for (String base : baseUrlsToTry()) {
+            try {
+                String result = postMultipartOnce(base, path, audioFile, sessionId);
+                workingBaseUrl = base;
+                return result;
+            } catch (IOException e) {
+                lastError = e;
+            }
+        }
+        throw lastError;
+    }
+
+    private String postMultipartOnce(String baseUrl, String path, File audioFile, String sessionId) throws IOException {
+        HttpURLConnection connection = openConnection(baseUrl, path);
         String boundary = "----MuseumDocentAI" + System.currentTimeMillis();
         try {
             connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);

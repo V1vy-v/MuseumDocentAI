@@ -58,8 +58,16 @@ MuseumDocentAI/
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+**前后端联调小贴士**：
+
+- APP 会自动尝试两个后端地址：模拟器默认的 `10.0.2.2:8000` 和 `127.0.0.1:8000`。
+- 如果电脑开了 Clash 等代理软件，模拟器可能连不上 `10.0.2.2`；在电脑上执行一次
+  `adb reverse tcp:8000 tcp:8000` 即可打通（APP 自动改用 127.0.0.1）。
+- 真机调试：手机和电脑连同一 WiFi，把电脑局域网 IP 加进 `ApiClient.java` 的地址列表。
+- 联调自测：后端启动后运行 `backend/scripts/smoke_test.py` 可一键验证语音闭环。
 
 ## 提交代码前注意
 

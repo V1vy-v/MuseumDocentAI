@@ -16,8 +16,8 @@ uvicorn app.main:app --reload --port 8000
 
 | 位置 | 谁负责 | 放什么 |
 |---|---|---|
-| `app/main.py` | D | 服务入口，启动后先访问 `/docs` 自测 |
-| `app/api/` | D | 对外接口：`chat.py` 文本问答、`voice.py` 语音问答 |
+| `app/main.py` | D | 服务入口；启动时建表并清理过期会话（lifespan） |
+| `app/api/` | D | 对外接口：`chat.py` 文本问答、`voice.py` 语音问答、`sessions.py` 会话管理 |
 | `app/services/llm_client.py` | D | 封装 mimo-v2.5-asr 的调用（语音输入→回答） |
 | `app/services/tts_client.py` | D | 语音合成（mimo 无语音输出时启用） |
 | `app/services/rag.py` | C | 检索增强：查询改写、检索资料、防幻觉、给出来源 |
@@ -26,10 +26,33 @@ uvicorn app.main:app --reload --port 8000
 | `app/services/coreference.py` | D | 指代消解：把「它」「这个」补成完整问句（先消解再检索） |
 | `app/core/config.py` | D | 配置：模型名、API 密钥、数据库路径（**不要把密钥提交到仓库**） |
 | `app/schemas/chat.py` | D | 请求/响应格式约定（**前端接口契约，不要改现有字段**） |
+| `app/schemas/session.py` | D | 会话管理接口的数据格式 |
 | `knowledge_base/` | C | 博物馆资料（文物介绍、历史背景、展厅路线、书画知识）+ 向量库 |
 | `tests/` | D | 单元测试（标准库 unittest，零依赖） |
 | `docs/` | D | 后端设计文档；跨前后端的全局文档放仓库根的 `docs/` |
 | `data/` | — | 运行时生成的会话数据库（已 gitignore，**不要提交**） |
+
+## 接口清单
+
+| 接口 | 说明 | 前端要不要调 |
+|---|---|---|
+| `POST /api/chat` | 文本问答 `{question, session_id}` → `{answer, sources}` | 已在用 |
+| `POST /api/voice` | 语音问答（multipart：`audio` + `session_id`）→ `{question, answer, sources, audio_base64}` | 已在用 |
+| `GET /api/health` | 健康检查 | 联调用 |
+| `POST /api/sessions` | 新建会话 → `{session_id, created_at, existed}` | **可选** |
+| `GET /api/sessions/{id}/messages` | 拉取历史 → `{session_id, title, summary, messages[]}` | **可选** |
+| `DELETE /api/sessions/{id}` | 清除会话（幂等，不存在返回 `deleted:false`） | **可选** |
+
+**关键：`/api/chat` 和 `/api/voice` 的入参和回参都没有变**，前端 `ApiClient` 一行都不用改。
+
+会话管理这三个是**可选增强**：`/api/chat`、`/api/voice` 首次写入时会自动建会话，
+所以前端照旧自己生成 UUID、完全不调它们，问答和持久化也正常工作。
+只有当你想实现「重启 APP 后恢复上次对话」时才需要用到：
+
+1. 把 `session_id` 存进 `SharedPreferences`（替代现在的每次 `UUID.randomUUID()`）；
+2. 启动时调 `GET /api/sessions/{id}/messages` 把历史回填到对话列表。
+
+`/docs` 里有可直接调用的交互式文档。
 
 ## 跑测试
 

@@ -11,3 +11,7 @@ python-multipart      # 语音接口上传录音文件用
 
 # —— 语音合成 ——
 # 不需要另装：语音输出用同平台的 mimo-v2.5-tts（已实测可用）
+
+# —— 测试 ——
+# 不需要另装：单元测试用标准库 unittest（见 tests/），零依赖即可运行
+# 想用 pytest 跑同一批用例也可以：uv pip install pytest（pytest 原生支持 unittest.TestCase）

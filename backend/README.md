@@ -27,6 +27,8 @@ uvicorn app.main:app --reload --port 8000
 - **左侧历史会话列表**：像通用聊天应用那样列出所有对话（标题取首问、相对时间、
   消息条数），点一下切换，悬停出删除按钮。空会话（没发过消息的）默认不显示
 - **一键跑指代消解回归**：依次发三句，验证「它」「这个」都能正确指向
+- **流式输出开关**：勾上走 `/api/chat/stream`，边生成边显示，并在气泡下标出
+  **首字延迟 / 总耗时 / 分块数**；取消勾选走 `/api/chat`，可以直接对比两种体感
 - **原始报文**：最近一次请求与响应，出错时能直接看到后端的 `{error, hint}`
 
 页面就是单个静态文件 `static/debug.html`，纯原生 JS，**零构建、无外部依赖、离线可用**。
@@ -79,6 +81,7 @@ uvicorn app.main:app --reload --port 8000
 | 接口 | 说明 | 前端要不要调 |
 |---|---|---|
 | `POST /api/chat` | 文本问答 `{question, session_id}` → `{answer, sources}` | 已在用 |
+| `POST /api/chat/stream` | **流式问答（SSE）**：`meta` → `delta`* → `done`/`error` | **可选**（接了才有打字机效果） |
 | `POST /api/voice` | 语音问答（multipart：`audio` + `session_id`）→ `{question, answer, sources, audio_base64}` | 已在用 |
 | `GET /api/health` | 健康检查 | 联调用 |
 | `POST /api/sessions` | 新建会话 → `{session_id, created_at, existed}` | **可选** |

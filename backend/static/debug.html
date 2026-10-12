@@ -130,6 +130,39 @@
     </section>
   </aside>
 
+  <main>
+    <section class="card">
+      <h2>
+        对话
+        <span class="spacer"></span>
+        <button id="btn-regress" title="依次发送三句，验证指代消解（会真实调用模型）">跑指代消解回归（3 轮）</button>
+        <button id="btn-clear-view">只清空显示</button>
+      </h2>
+      <div id="chat"><div class="empty">换个问题开始吧。首句请带上文物名，之后就可以用「它」「这个」追问。</div></div>
+    </section>
+
+    <section class="card">
+      <h2>提问</h2>
+      <div class="body">
+        <textarea id="question" placeholder="例如：越王勾践剑是什么时期的文物？&#10;Enter 发送，Shift+Enter 换行"></textarea>
+        <div class="row">
+          <button class="primary" id="btn-send">发送</button>
+          <span class="hint" id="sending-hint"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>原始报文</h2>
+      <div class="body">
+        <details open>
+          <summary>最近一次请求 / 响应</summary>
+          <pre id="raw">（还没有请求）</pre>
+        </details>
+      </div>
+    </section>
+  </main>
+
   <aside class="debug">
     <section class="card">
       <h2>会话控制</h2>
@@ -175,39 +208,6 @@
       </div>
     </section>
   </aside>
-
-  <main>
-    <section class="card">
-      <h2>
-        对话
-        <span class="spacer"></span>
-        <button id="btn-regress" title="依次发送三句，验证指代消解（会真实调用模型）">跑指代消解回归（3 轮）</button>
-        <button id="btn-clear-view">只清空显示</button>
-      </h2>
-      <div id="chat"><div class="empty">换个问题开始吧。首句请带上文物名，之后就可以用「它」「这个」追问。</div></div>
-    </section>
-
-    <section class="card">
-      <h2>提问</h2>
-      <div class="body">
-        <textarea id="question" placeholder="例如：越王勾践剑是什么时期的文物？&#10;Enter 发送，Shift+Enter 换行"></textarea>
-        <div class="row">
-          <button class="primary" id="btn-send">发送</button>
-          <span class="hint" id="sending-hint"></span>
-        </div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>原始报文</h2>
-      <div class="body">
-        <details open>
-          <summary>最近一次请求 / 响应</summary>
-          <pre id="raw">（还没有请求）</pre>
-        </details>
-      </div>
-    </section>
-  </main>
 </div>
 
 <script>

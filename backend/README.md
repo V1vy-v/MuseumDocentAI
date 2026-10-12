@@ -30,6 +30,27 @@ uvicorn app.main:app --reload --port 8000
 页面就是单个静态文件 `static/debug.html`，纯原生 JS，**零构建、无外部依赖、离线可用**。
 改完直接刷新浏览器即可，不用重启服务。它本身不是对外接口，所以没进 `/docs`。
 
+### 临时调参（比如想立刻看到滚动摘要）
+
+这几个数值配置可以用环境变量覆盖，**不用改代码**：
+
+```powershell
+# PowerShell：把压缩阈值调低，聊几轮就能看到摘要
+$env:SUMMARY_TRIGGER_TOKENS = "200"
+$env:RECENT_TOKEN_BUDGET = "150"
+uvicorn app.main:app --reload --port 8000
+```
+
+| 环境变量 | 默认 | 作用 |
+|---|---|---|
+| `CHAT_DB_PATH` | `backend/data/chat.db` | 数据库位置（测试用它指到临时文件） |
+| `RECENT_TOKEN_BUDGET` | 1200 | 最近多少 token 的对话原样喂给模型 |
+| `SUMMARY_TRIGGER_TOKENS` | 2400 | 窗口外累积超过此值才压缩一次 |
+| `SUMMARY_MAX_CHARS` | 400 | 摘要长度上限 |
+| `PROMPT_TOKEN_ALERT` | 6000 | 提示词超过此值就告警 |
+
+值写错（比如填了非数字）会退回默认值，不会把服务带崩。
+
 ## 目录说明
 
 | 位置 | 谁负责 | 放什么 |

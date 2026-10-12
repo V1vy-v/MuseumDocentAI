@@ -24,6 +24,20 @@ def _load_env():
 
 _load_env()
 
+
+def _int_env(name: str, default: int) -> int:
+    """读一个整数配置，允许用环境变量覆盖（调参和调试用）。
+
+    临时想验证长对话摘要时，不必改代码，启动前设一下就行：
+        $env:SUMMARY_TRIGGER_TOKENS = "200"   # PowerShell
+        SUMMARY_TRIGGER_TOKENS=200 uvicorn …  # bash
+    值不合法时退回默认值，不让配置错误把服务带崩。
+    """
+    try:
+        return int(os.environ[name])
+    except (KeyError, ValueError):
+        return default
+
 # —— 大脑模型：mimo 系列（同一平台，已实测可用）——
 # 实测结论：
 #   mimo-v2.5-asr   语音输入（听懂提问，返回文字）
@@ -58,10 +72,10 @@ DB_PATH = Path(os.environ.get("CHAT_DB_PATH", DATA_DIR / "chat.db"))
 #   2. 中文经验值 1 个汉字 ≈ 1 个 token（实测 13 字 → 15 prompt_token，含模板开销），
 #      估算只用于"何时压缩"，宁可略大（早压缩是安全方向）。
 #   tiktoken 是 OpenAI 的词表，对 mimo 本来就不准，还要加依赖，不用。
-RECENT_TOKEN_BUDGET = 1200     # 最近多少 token 的对话原样喂给模型
-SUMMARY_TRIGGER_TOKENS = 2400  # 滑出窗口且未被摘要覆盖的部分累积超过此值才压缩一次
-SUMMARY_MAX_CHARS = 400        # 摘要文本长度上限（它也要占 prompt 预算）
-PROMPT_TOKEN_ALERT = 6000      # 整个提示词超过此值就告警：说明光压历史已不够用
+RECENT_TOKEN_BUDGET = _int_env("RECENT_TOKEN_BUDGET", 1200)          # 最近多少 token 的对话原样喂给模型
+SUMMARY_TRIGGER_TOKENS = _int_env("SUMMARY_TRIGGER_TOKENS", 2400)    # 滑出窗口且未被摘要覆盖的部分累积超过此值才压缩一次
+SUMMARY_MAX_CHARS = _int_env("SUMMARY_MAX_CHARS", 400)               # 摘要文本长度上限（它也要占 prompt 预算）
+PROMPT_TOKEN_ALERT = _int_env("PROMPT_TOKEN_ALERT", 6000)           # 整个提示词超过此值就告警：说明光压历史已不够用
 
 # —— 会话治理 ——
 MAX_MSG_PER_SESSION = 500

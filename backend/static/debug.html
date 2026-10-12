@@ -54,6 +54,11 @@
   #session-list li:hover .del { display: block; }
   #session-list .del:hover { color: var(--warn); }
   button.wide { width: 100%; }
+  .chk { display: inline-flex; align-items: center; gap: 5px; font-size: 13px;
+         color: var(--muted); cursor: pointer; user-select: none; }
+  .chk input { margin: 0; }
+  .timing { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .timing b { color: var(--ok); font-weight: 600; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
   .card > h2 {
     font-size: 13px; margin: 0; padding: 9px 12px; border-bottom: 1px solid var(--line);
@@ -147,6 +152,9 @@
         <textarea id="question" placeholder="例如：越王勾践剑是什么时期的文物？&#10;Enter 发送，Shift+Enter 换行"></textarea>
         <div class="row">
           <button class="primary" id="btn-send">发送</button>
+          <label class="chk" title="走 POST /api/chat/stream，边生成边显示">
+            <input type="checkbox" id="chk-stream" checked> 流式输出
+          </label>
           <span class="hint" id="sending-hint"></span>
         </div>
       </div>
@@ -416,17 +424,26 @@ async function send(text) {
       setSession(s.session_id);
     }
 
-    appendBubble("user", question);
+    const userBubble = appendBubble("user", question);
     if (text === undefined) $("question").value = "";
 
-    const body = { question: question, session_id: sessionId };
-    const data = await api("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json; charset=utf-8" },
-      body: JSON.stringify(body),
-    });
-    setRaw("POST /api/chat " + JSON.stringify(body), data);
-    appendBubble("assistant", data.answer, data.sources);
+    if ($("chk-stream").checked) {
+      // 流式：先放一个空气泡，边收边往里追加
+      const botBubble = appendBubble("assistant", "");
+      const info = await streamAnswer(question, botBubble);
+      addTiming(botBubble, info);
+      addResolvedNote(userBubble, info.resolved, question);
+    } else {
+      const body = { question: question, session_id: sessionId };
+      const data = await api("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify(body),
+      });
+      setRaw("POST /api/chat " + JSON.stringify(body), data);
+      appendBubble("assistant", data.answer, data.sources);
+    }
+
     // 再拉一次历史：消解结果、摘要、token 用量只有 /messages 才有
     await loadHistory(true);
     await loadSessionList();          // 标题和排序会变，顺手刷新左侧列表
@@ -439,6 +456,81 @@ async function send(text) {
     $("btn-regress").disabled = false;
     $("sending-hint").textContent = "";
   }
+}
+
+/* ---------- 流式（SSE）---------- */
+
+function parseSse(block) {
+  let name = "message";
+  const dataLines = [];
+  for (const line of block.split("\n")) {
+    if (line.startsWith("event:")) name = line.slice(6).trim();
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+  }
+  if (!dataLines.length) return [];
+  try {
+    return [[name, JSON.parse(dataLines.join("\n"))]];
+  } catch (_) {
+    return [];
+  }
+}
+
+async function streamAnswer(question, bubbleWrap) {
+  const t0 = performance.now();
+  const info = { ttft: null, total: 0, nDelta: 0, usage: null, resolved: "", answer: "" };
+  const counts = {};
+
+  const res = await fetch("/api/chat/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({ question: question, session_id: sessionId }),
+  });
+  if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let pending = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    // stream:true 是必须的：一个汉字可能被切成多字节跨块到达，
+    // 不加这个参数解码会在块边界上产生乱码
+    pending += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+    let idx;
+    while ((idx = pending.indexOf("\n\n")) >= 0) {   // 空行 = 一个事件结束
+      const block = pending.slice(0, idx);
+      pending = pending.slice(idx + 2);
+      for (const [name, data] of parseSse(block)) {
+        counts[name] = (counts[name] || 0) + 1;
+        if (name === "meta") {
+          info.resolved = data.resolved || "";
+          // 来源在模型开始生成之前就拿到了，可以先显示出来
+          if (data.sources && data.sources.length) {
+            setSources(bubbleWrap.querySelector(".bubble"), data.sources);
+          }
+        } else if (name === "delta") {
+          if (info.ttft === null) info.ttft = (performance.now() - t0) / 1000;
+          info.nDelta += 1;
+          appendText(bubbleWrap, data.text);
+        } else if (name === "done") {
+          info.usage = data.usage || null;
+          info.answer = data.answer || "";
+        } else if (name === "error") {
+          showError(data.hint || data.error || "流式出错", data);
+        }
+      }
+    }
+  }
+
+  info.total = (performance.now() - t0) / 1000;
+  setRaw("POST /api/chat/stream（SSE）", {
+    session_id: sessionId, resolved: info.resolved, event_counts: counts,
+    ttft_seconds: info.ttft === null ? null : +info.ttft.toFixed(2),
+    total_seconds: +info.total.toFixed(2),
+    answer_chars: info.answer.length, usage: info.usage,
+  });
+  return info;
 }
 
 /* ---------- 渲染 ---------- */
@@ -454,18 +546,58 @@ function appendBubble(role, text, sources, isError) {
   const bubble = document.createElement("div");
   bubble.className = "bubble";
   if (isError) bubble.style.color = "var(--warn)";
-  bubble.textContent = text;
 
-  if (sources && sources.length) {
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.innerHTML = "来源：" + sources.map(s => "<code>" + escapeHtml(s) + "</code>").join(" ");
-    bubble.appendChild(meta);
-  }
+  // 文本单独放一个 span：流式输出要能一段段往里追加，
+  // 而 .meta（来源、耗时）是它的兄弟节点，不会被追加操作冲掉
+  const span = document.createElement("span");
+  span.className = "txt";
+  span.textContent = text || "";
+  bubble.appendChild(span);
+
+  if (sources && sources.length) setSources(bubble, sources);
   wrap.appendChild(bubble);
   chat.appendChild(wrap);
   chat.scrollTop = chat.scrollHeight;
   return wrap;
+}
+
+function setSources(bubble, sources) {
+  let meta = bubble.querySelector(".meta.sources");
+  if (!meta) {
+    meta = document.createElement("div");
+    meta.className = "meta sources";
+    bubble.appendChild(meta);
+  }
+  meta.innerHTML = "来源：" + sources.map(s => "<code>" + escapeHtml(s) + "</code>").join(" ");
+}
+
+function appendText(wrap, piece) {
+  const span = wrap.querySelector(".bubble .txt");
+  if (span) span.textContent += piece;
+  const chat = $("chat");
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addTiming(wrap, info) {
+  const line = document.createElement("div");
+  line.className = "timing";
+  const parts = [];
+  if (info.ttft !== null) parts.push("首字 <b>" + info.ttft.toFixed(2) + "s</b>");
+  parts.push("总 <b>" + info.total.toFixed(2) + "s</b>");
+  parts.push(info.nDelta + " 块");
+  if (info.usage && info.usage.prompt_tokens) {
+    parts.push("prompt " + info.usage.prompt_tokens + " tok");
+  }
+  line.innerHTML = parts.join(" · ");
+  wrap.querySelector(".bubble").appendChild(line);
+}
+
+function addResolvedNote(wrap, resolved, original) {
+  if (!resolved || resolved === original) return;
+  const note = document.createElement("div");
+  note.className = "meta resolved";
+  note.textContent = "→ 消解为：" + resolved;
+  wrap.querySelector(".bubble").appendChild(note);
 }
 
 function escapeHtml(s) {
@@ -591,15 +723,7 @@ function renderChatFromState() {
   chat.innerHTML = "";
   (state.messages || []).forEach(m => {
     if (m.role === "assistant") appendBubble("assistant", m.content, m.sources);
-    else {
-      const wrap = appendBubble("user", m.content);
-      if (m.resolved && m.resolved !== m.content) {
-        const note = document.createElement("div");
-        note.className = "meta resolved";
-        note.textContent = "→ 消解为：" + m.resolved;
-        wrap.querySelector(".bubble").appendChild(note);
-      }
-    }
+    else addResolvedNote(appendBubble("user", m.content), m.resolved, m.content);
   });
   if (!(state.messages || []).length) {
     chat.innerHTML = '<div class="empty">这个会话还没有消息。</div>';

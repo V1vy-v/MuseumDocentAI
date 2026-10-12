@@ -15,12 +15,14 @@
 #      对语音这种延迟敏感的场景，这个开销要心里有数。
 
 import base64
+import json
 
 import requests
 
 from ..core import config
 
-_TIMEOUT = 60  # 秒
+_TIMEOUT = 60              # 秒，非流式：整个请求的上限
+_STREAM_TIMEOUT = (10, 60)  # 秒，(连接, 每次读)。流式下读超时是"多久没新数据才算卡死"
 
 
 def _headers():
@@ -60,16 +62,11 @@ def transcribe(wav_bytes: bytes) -> str:
     return _content(_chat_raw([payload_user], config.MIMO_ASR_MODEL))
 
 
-def chat_reply(question: str, history: list, sources: list, summary: str = "") -> tuple:
-    """文本回答：问题 + 历史摘要 + 对话历史 + 检索资料 → 讲解员式回答
+def _build_messages(question: str, history: list, sources: list, summary: str) -> list:
+    """拼装发给模型的消息。
 
-    参数：
-        question：观众本轮原话（不要传指代消解改写过的，模型要看到原话）
-        history ：[{"role","content"}]，最近若干轮，已按轮对齐
-        sources ：rag.retrieve() 返回的资料片段 [{"title","content"}]
-        summary ：更早对话的压缩摘要，空串表示还没有
-
-    返回：(回答文本, 用量字典)。用量来自服务端，用于安全阀和排查。
+    chat_reply 和 stream_reply 共用一份，避免两条路径慢慢跑偏
+    （历史上就吃过"改了一处忘了另一处"的亏）。
     """
     system = config.SYSTEM_PROMPT
 
@@ -91,9 +88,68 @@ def chat_reply(question: str, history: list, sources: list, summary: str = "") -
     # 原来那句 history[-10:] 会把一轮问答从中间切开，让模型看到没有提问的回答。
     messages += history
     messages.append({"role": "user", "content": question})
+    return messages
 
-    data = _chat_raw(messages, config.MIMO_TEXT_MODEL)
+
+def chat_reply(question: str, history: list, sources: list, summary: str = "") -> tuple:
+    """文本回答：问题 + 历史摘要 + 对话历史 + 检索资料 → 讲解员式回答
+
+    参数：
+        question：观众本轮原话（不要传指代消解改写过的，模型要看到原话）
+        history ：[{"role","content"}]，最近若干轮，已按轮对齐
+        sources ：rag.retrieve() 返回的资料片段 [{"title","content"}]
+        summary ：更早对话的压缩摘要，空串表示还没有
+
+    返回：(回答文本, 用量字典)。用量来自服务端，用于安全阀和排查。
+    """
+    data = _chat_raw(_build_messages(question, history, sources, summary),
+                     config.MIMO_TEXT_MODEL)
     return _content(data), _usage(data)
+
+
+def stream_reply(question: str, history: list, sources: list, summary: str = ""):
+    """流式版 chat_reply：逐块产出，最后产出用量。
+
+    产出 (类型, 数据) 二元组：
+        ("delta", 文本片段)
+        ("usage", 用量字典)     —— 服务端在流末尾给；老接口可能没有
+
+    实测（2026-10）：首字 1.85~3.03s，而整段要 24~30s。
+    所以流式把"感知延迟"降了约 10 倍，总时长不变。
+
+    改这个函数时别踩回这两个坑：
+        1. iter_lines() 不要加 decode_unicode=True——响应头没声明 charset 时
+           requests 会退回 latin-1 解码，中文全变乱码。要自己按 UTF-8 解字节。
+        2. 流式下 timeout 是"每次读"的超时，不是整个请求的超时。
+           所以 60 秒的含义变成"60 秒没有新数据才失败"，正合适。
+    """
+    payload = {"model": config.MIMO_TEXT_MODEL,
+               "messages": _build_messages(question, history, sources, summary),
+               "stream": True}
+    resp = requests.post(config.MIMO_API_URL + "/chat/completions",
+                         headers=_headers(), json=payload,
+                         stream=True, timeout=_STREAM_TIMEOUT)
+    resp.raise_for_status()
+
+    for raw in resp.iter_lines():
+        if not raw:                       # SSE 用空行分隔事件
+            continue
+        line = raw.decode("utf-8", errors="replace")
+        if not line.startswith("data:"):
+            continue
+        body = line[5:].strip()
+        if body == "[DONE]":
+            break
+        try:
+            chunk = json.loads(body)
+        except ValueError:
+            continue                      # 半截的 JSON 行跳过，不让它打断整条流
+        for choice in chunk.get("choices") or []:
+            piece = (choice.get("delta") or {}).get("content")
+            if piece:
+                yield ("delta", piece)
+        if chunk.get("usage"):
+            yield ("usage", chunk["usage"])
 
 
 def summarize(old_summary: str, turns: list) -> str:

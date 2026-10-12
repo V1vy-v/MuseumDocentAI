@@ -143,6 +143,7 @@ class RouteRegistrationTest(unittest.TestCase):
 
     EXPECTED = {
         "/api/chat": {"post"},
+        "/api/chat/stream": {"post"},
         "/api/voice": {"post"},
         "/api/health": {"get"},
         "/api/sessions": {"get", "post"},

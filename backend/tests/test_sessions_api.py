@@ -204,5 +204,61 @@ class LifespanStartupTest(unittest.TestCase):
         self.assertTrue(store.session_exists("recent"), "未过期的会话不能被误删")
 
 
+class DebugUiTest(unittest.TestCase):
+    """调试台：纯静态单文件，不依赖任何前端工具链"""
+
+    def test_page_file_exists_with_key_panels(self):
+        from app.main import DEBUG_PAGE
+        self.assertTrue(DEBUG_PAGE.exists(), f"缺少调试台页面 {DEBUG_PAGE}")
+        text = DEBUG_PAGE.read_text(encoding="utf-8")
+        self.assertIn("后端调试台", text)
+        for panel in ("会话控制", "滚动摘要", "消息明细", "原始报文", "指代消解回归"):
+            with self.subTest(panel=panel):
+                self.assertIn(panel, text)
+
+    def test_page_has_no_external_dependency(self):
+        """不能引用 CDN：这台机器访问外网要走代理，离线也得能用"""
+        from app.main import DEBUG_PAGE
+        text = DEBUG_PAGE.read_text(encoding="utf-8")
+        for bad in ("http://cdn", "https://cdn", "https://unpkg", "https://cdnjs"):
+            with self.subTest(bad=bad):
+                self.assertNotIn(bad, text)
+
+    def test_route_registered_but_hidden_from_openapi(self):
+        from app import main
+        paths = {getattr(r, "path", None) for r in main.app.routes}
+        self.assertIn("/debug", paths, "调试台路由没挂上")
+        self.assertNotIn("/debug", main.app.openapi()["paths"],
+                         "调试台是工具，不该进对外接口文档")
+
+    def test_debug_ui_parses_flat_error_shape(self):
+        """调试台的错误解析要跟后端摊平后的格式一致，否则报错时显示不出提示"""
+        from app.main import DEBUG_PAGE
+        text = DEBUG_PAGE.read_text(encoding="utf-8")
+        self.assertIn("data.hint", text)
+        self.assertIn("data.error", text)
+
+
+class ResponseFieldTest(SessionsApiTestCase):
+    """调试台依赖的诊断字段：消解结果、每条 token、最近一次真实用量"""
+
+    def test_messages_expose_resolved_and_tokens(self):
+        memory.remember("s1", "user", "它是什么年代的？", resolved="越王勾践剑是什么年代的？")
+        memory.remember("s1", "assistant", "春秋晚期越国青铜剑。")
+        resp = get_messages("s1")
+        self.assertEqual(resp.messages[0].resolved, "越王勾践剑是什么年代的？")
+        self.assertTrue(all(m.tokens > 0 for m in resp.messages),
+                        "每条消息都要带 token 估算值，否则看不出窗口是怎么切的")
+
+    def test_exposes_last_prompt_tokens(self):
+        memory.remember("s1", "user", "问")
+        store.set_last_prompt_tokens("s1", 377)
+        self.assertEqual(get_messages("s1").last_prompt_tokens, 377)
+
+    def test_last_prompt_tokens_defaults_to_zero(self):
+        memory.remember("s1", "user", "问")
+        self.assertEqual(get_messages("s1").last_prompt_tokens, 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

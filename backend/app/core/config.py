@@ -65,20 +65,34 @@ DB_PATH = Path(os.environ.get("CHAT_DB_PATH", DATA_DIR / "chat.db"))
 
 # —— 上下文窗口与长对话摘要（按 token 预算，而不是消息条数）——
 # 为什么用 token 而不是条数：一条 500 字的资料和一句"嗯"都算一条消息，
-# 按条数切窗口完全不准；而 token 才是真正的资源约束（成本和上下文上限）。
+# 按条数切窗口完全不准；token 才是真正的资源约束。
 #
-# 这里不需要分词器：
+# 为什么窗口可以开这么大（2026-10 实测，不是估计）：
+#   - mimo-v2.6-flash 上下文窗口是 1M，输入价 $0.14 / 1M token
+#     → 12000 token 的提示词约 $0.0017/次，可忽略；
+#   - 提示词从 162 token 拉到 23598 token，耗时没有单调变差
+#     （延迟主要由输出/思考 token 和平台波动决定，实测波动 1.5s~16.6s）；
+#   - 前缀缓存生效：实测 cached_tokens 接近全量，重复前缀基本不重复计费。
+# 所以窗口大小的依据不是"装不下"，而是"要不要留这么多原文"。
+#
+# 不需要分词器：
 #   1. mimo 接口在 usage 里返回真实用量，安全阀直接用服务端数字；
-#   2. 中文经验值 1 个汉字 ≈ 1 个 token（实测 13 字 → 15 prompt_token，含模板开销），
-#      估算只用于"何时压缩"，宁可略大（早压缩是安全方向）。
+#   2. 中文经验值 1 个汉字 ≈ 1 个 token（实测 13 字 → 15 prompt_token，含模板开销）。
 #   tiktoken 是 OpenAI 的词表，对 mimo 本来就不准，还要加依赖，不用。
-RECENT_TOKEN_BUDGET = _int_env("RECENT_TOKEN_BUDGET", 1200)          # 最近多少 token 的对话原样喂给模型
-SUMMARY_TRIGGER_TOKENS = _int_env("SUMMARY_TRIGGER_TOKENS", 2400)    # 滑出窗口且未被摘要覆盖的部分累积超过此值才压缩一次
+#
+# 注意"窗口"和"触发阈值"是两件事：
+#   窗口 = 保留多少原文；阈值 = 滑出窗口的部分攒到多少才压缩。
+#   窗口 12000 之后，一次正常参观（30~60 问 ≈ 2200~4400 token）根本不会溢出，
+#   所以阈值取小也不影响正常使用——它只在超长对话里生效。
+RECENT_TOKEN_BUDGET = _int_env("RECENT_TOKEN_BUDGET", 12000)         # 最近多少 token 的对话原样喂给模型（约 160 轮）
+SUMMARY_TRIGGER_TOKENS = _int_env("SUMMARY_TRIGGER_TOKENS", 1500)    # 滑出窗口且未被摘要覆盖的部分累积超过此值就压缩
 SUMMARY_MAX_CHARS = _int_env("SUMMARY_MAX_CHARS", 400)               # 摘要文本长度上限（它也要占 prompt 预算）
-PROMPT_TOKEN_ALERT = _int_env("PROMPT_TOKEN_ALERT", 6000)           # 整个提示词超过此值就告警：说明光压历史已不够用
+PROMPT_TOKEN_ALERT = _int_env("PROMPT_TOKEN_ALERT", 200000)         # 整个提示词超过此值就告警（1M 上下文，留足余量）
 
 # —— 会话治理 ——
-MAX_MSG_PER_SESSION = 500
+# 增长只靠 TTL 控制：一轮问答约 200 字节，规模上完全不需要再设条数上限。
+# （原先那个 MAX_MSG_PER_SESSION 定义了却从没被使用过，已删除——
+#   留着会让人误以为有保护。）
 SESSION_TTL_DAYS = 7
 
 # —— 讲解员人设（System Prompt）——

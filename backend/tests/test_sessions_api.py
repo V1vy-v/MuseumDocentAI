@@ -17,7 +17,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi import HTTPException                      # noqa: E402
 
-from app.api.sessions import create_session, delete_session, get_messages  # noqa: E402
+from app.api.sessions import (create_session, delete_session, get_messages,  # noqa: E402
+                              list_sessions)
 from app.core import config                            # noqa: E402
 from app.schemas.session import SessionCreateRequest   # noqa: E402
 from app.services import memory, store                 # noqa: E402
@@ -134,23 +135,87 @@ class DeleteSessionTest(SessionsApiTestCase):
 
 
 class RouteRegistrationTest(unittest.TestCase):
-    """确认新接口真的挂到了应用上（而不是写了文件忘了 include_router）"""
+    """确认接口真的挂到了应用上（而不是写了文件忘了 include_router）。
 
-    def test_all_six_endpoints_registered(self):
+    按"路径 + 方法"一起核对：光数路径个数会漏掉"同一路径新增了方法"这种情况
+    （比如 /api/sessions 后来加了 GET 列表，路径个数是不变的）。
+    """
+
+    EXPECTED = {
+        "/api/chat": {"post"},
+        "/api/voice": {"post"},
+        "/api/health": {"get"},
+        "/api/sessions": {"get", "post"},
+        "/api/sessions/{session_id}/messages": {"get"},
+        "/api/sessions/{session_id}": {"delete"},
+    }
+
+    def test_all_endpoints_registered_with_expected_methods(self):
         from app import main
         paths = main.app.openapi()["paths"]
-        for path in ("/api/chat", "/api/voice", "/api/health",
-                     "/api/sessions", "/api/sessions/{session_id}/messages",
-                     "/api/sessions/{session_id}"):
+        self.assertEqual(set(paths), set(self.EXPECTED))
+        for path, methods in self.EXPECTED.items():
             with self.subTest(path=path):
-                self.assertIn(path, paths)
-        self.assertEqual(len(paths), 6, f"接口数应为 6，实际 {sorted(paths)}")
+                missing = methods - set(paths[path])
+                self.assertFalse(missing, f"{path} 缺少方法 {missing}")
 
     def test_create_body_is_optional(self):
         """POST /api/sessions 必须允许不带请求体（前端最省事的调用方式）"""
         from app import main
         spec = main.app.openapi()["paths"]["/api/sessions"]["post"]
         self.assertFalse(spec.get("requestBody", {}).get("required", False))
+
+
+class ListSessionsTest(SessionsApiTestCase):
+    """GET /api/sessions：界面左侧的历史会话列表"""
+
+    def test_empty_when_nothing_happened(self):
+        resp = list_sessions()
+        self.assertEqual(resp.sessions, [])
+        self.assertEqual(resp.count, 0)
+
+    def test_carries_title_and_message_count(self):
+        memory.remember("s1", "user", "越王勾践剑是什么时期的文物？")
+        memory.remember("s1", "assistant", "春秋晚期越国青铜剑。")
+        resp = list_sessions()
+        self.assertEqual(resp.count, 1)
+        item = resp.sessions[0]
+        self.assertEqual(item.session_id, "s1")
+        self.assertEqual(item.title, "越王勾践剑是什么时期的文物？")
+        self.assertEqual(item.message_count, 2)
+
+    def test_hides_empty_sessions_by_default(self):
+        create_session(SessionCreateRequest(session_id="empty"))
+        memory.remember("used", "user", "问")
+        ids = [s.session_id for s in list_sessions().sessions]
+        self.assertNotIn("empty", ids, "没发过消息的会话不该出现在历史里")
+        self.assertIn("used", ids)
+
+    def test_include_empty_flag(self):
+        create_session(SessionCreateRequest(session_id="empty"))
+        ids = [s.session_id for s in list_sessions(include_empty=True).sessions]
+        self.assertIn("empty", ids)
+
+    def test_newest_first(self):
+        memory.remember("older", "user", "先问的")
+        old = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+        with store._connect() as conn:
+            conn.execute("UPDATE sessions SET updated_at = ? WHERE session_id = ?", (old, "older"))
+            conn.commit()
+        memory.remember("newer", "user", "后问的")
+        self.assertEqual([s.session_id for s in list_sessions().sessions][0], "newer")
+
+    def test_respects_limit(self):
+        for i in range(5):
+            memory.remember(f"s{i}", "user", f"第{i}问")
+        self.assertEqual(len(list_sessions(limit=2).sessions), 2)
+
+    def test_does_not_leak_message_content(self):
+        """列表只带展示需要的字段，不把消息正文一起拖出来"""
+        memory.remember("s1", "user", "越王勾践剑是什么时期的文物？")
+        item = list_sessions().sessions[0]
+        self.assertEqual(set(item.model_dump().keys()),
+                         {"session_id", "title", "created_at", "updated_at", "message_count"})
 
 
 class LifespanStartupTest(unittest.TestCase):

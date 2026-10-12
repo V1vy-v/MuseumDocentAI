@@ -353,10 +353,34 @@ class SessionGovernanceTest(TempDBTestCase):
         ids = [s["session_id"] for s in store.list_sessions()]
         self.assertEqual(ids[0], "newer")
 
-    def test_created_session_is_listed(self):
+    def test_empty_session_is_hidden_from_list(self):
+        """建了但没发过消息的会话不该出现在历史列表里（和通用聊天应用一致）"""
         sid = store.create_session()
         self.assertTrue(store.session_exists(sid))
-        self.assertIn(sid, [s["session_id"] for s in store.list_sessions()])
+        self.assertNotIn(sid, [s["session_id"] for s in store.list_sessions()])
+
+    def test_empty_session_listed_when_explicitly_requested(self):
+        sid = store.create_session()
+        ids = [s["session_id"] for s in store.list_sessions(include_empty=True)]
+        self.assertIn(sid, ids)
+
+    def test_list_carries_title_and_message_count(self):
+        # 注意用 memory.remember 而不是 store.append_message：
+        # 标题是 memory 层写进去的（取首问），直接写 store 不会设标题
+        memory.remember(self.sid, "user", "越王勾践剑是什么时期的文物？")
+        memory.remember(self.sid, "assistant", "春秋晚期越国青铜剑。")
+        row = next(s for s in store.list_sessions() if s["session_id"] == self.sid)
+        self.assertEqual(row["title"], "越王勾践剑是什么时期的文物？")
+        self.assertEqual(row["message_count"], 2)
+
+    def test_same_second_ties_are_stable(self):
+        """updated_at 精度只到秒；同一秒内建的会话顺序也必须稳定，否则列表会乱跳"""
+        memory.remember("a", "user", "第一个")
+        memory.remember("b", "user", "第二个")
+        memory.remember("c", "user", "第三个")
+        for _ in range(3):
+            ids = [s["session_id"] for s in store.list_sessions()]
+            self.assertEqual(ids[:3], ["c", "b", "a"], "顺序应稳定，且新的在前")
 
 
 class MigrationTest(unittest.TestCase):

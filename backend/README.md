@@ -71,7 +71,7 @@ uvicorn app.main:app --reload --port 8000
 | `knowledge_base/` | C | 博物馆资料（文物介绍、历史背景、展厅路线、书画知识）+ 向量库 |
 | `static/debug.html` | D | 调试台页面（纯静态单文件，挂在 `/debug`） |
 | `tests/` | D | 单元测试（标准库 unittest，零依赖） |
-| `docs/` | D | 后端文档：`后端设计文档.md`（课程用）、`接口文档.md`、`记忆系统与指代消解方案.md`；跨前后端的全局文档放仓库根的 `docs/` |
+| `docs/` | D | 后端文档：`后端PRD.md`（需求文档，课程用）、`接口文档.md`、`记忆系统与指代消解方案.md`；跨前后端的全局文档放仓库根的 `docs/` |
 | `data/` | — | 运行时生成的会话数据库（已 gitignore，**不要提交**） |
 
 ## 接口清单

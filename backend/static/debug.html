@@ -26,8 +26,34 @@
     border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px;
   }
   .layout { display: flex; align-items: flex-start; gap: 14px; padding: 14px; }
-  aside { width: 340px; flex: 0 0 340px; display: flex; flex-direction: column; gap: 12px; }
+  aside { display: flex; flex-direction: column; gap: 12px; }
+  aside.sessions { width: 238px; flex: 0 0 238px; }
+  aside.debug { width: 330px; flex: 0 0 330px; }
   main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  /* 左侧历史会话列表 */
+  #session-list {
+    list-style: none; margin: 10px 0 0; padding: 0;
+    display: flex; flex-direction: column; gap: 3px;
+    max-height: calc(100vh - 210px); overflow-y: auto;
+  }
+  #session-list li {
+    position: relative; padding: 7px 24px 7px 9px;
+    border: 1px solid transparent; border-radius: 7px; cursor: pointer;
+  }
+  #session-list li:hover { background: #f2f4f7; }
+  #session-list li.active { background: var(--user); border-color: #c5d9fb; }
+  #session-list li.placeholder { cursor: default; color: var(--muted); font-size: 12px; padding: 7px 9px; }
+  #session-list li.placeholder:hover { background: none; }
+  #session-list .t { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #session-list .s { font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; gap: 5px; }
+  #session-list .del {
+    position: absolute; right: 3px; top: 5px; border: 0; background: none;
+    color: var(--muted); cursor: pointer; padding: 0 4px; font-size: 13px;
+    line-height: 1; display: none;
+  }
+  #session-list li:hover .del { display: block; }
+  #session-list .del:hover { color: var(--warn); }
+  button.wide { width: 100%; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
   .card > h2 {
     font-size: 13px; margin: 0; padding: 9px 12px; border-bottom: 1px solid var(--line);
@@ -93,7 +119,18 @@
 <div id="error"></div>
 
 <div class="layout">
-  <aside>
+
+  <aside class="sessions">
+    <section class="card">
+      <h2>历史会话 <span class="spacer"></span><button id="btn-refresh-list" title="重新拉取列表">刷新</button></h2>
+      <div class="body">
+        <button class="primary wide" id="btn-new-top">＋ 新建会话</button>
+        <ul id="session-list"></ul>
+      </div>
+    </section>
+  </aside>
+
+  <aside class="debug">
     <section class="card">
       <h2>会话控制</h2>
       <div class="body">
@@ -181,6 +218,7 @@ const LS_KEY = "museum_debug_session_id";
 
 let sessionId = localStorage.getItem(LS_KEY) || "";
 let state = null;          // 最近一次 /messages 的响应
+let sessionList = [];      // 最近一次 /api/sessions 的列表
 let busy = false;
 
 /* ---------- 基础请求 ---------- */
@@ -235,6 +273,8 @@ async function newSession() {
   state = null;
   render();
   $("chat").innerHTML = '<div class="empty">新会话已建立。开始提问吧。</div>';
+  // 空会话不会出现在历史列表里（要用发出第一条消息后才有）——和通用聊天应用一致
+  await loadSessionList();
 }
 
 async function loadHistory(silent) {
@@ -254,12 +294,7 @@ async function loadHistory(silent) {
 
 async function deleteSession() {
   if (!sessionId) { showError("没有可删除的会话。"); return; }
-  clearError();
-  const data = await api("/api/sessions/" + encodeURIComponent(sessionId), { method: "DELETE" });
-  setRaw("DELETE /api/sessions/" + sessionId, data);
-  showInfo(`删除结果：deleted = ${data.deleted}` + (data.deleted ? "" : "（这个会话本来就不存在，删除是幂等的）"));
-  await loadHistory(true);
-  $("chat").innerHTML = '<div class="empty">会话已删除（原文和摘要都随外键级联清掉了）。</div>';
+  await deleteSessionById(sessionId);
 }
 
 function showInfo(msg) {
@@ -270,6 +305,93 @@ function showInfo(msg) {
   box.style.color = "#1a7f37";
   box.textContent = "✓ " + msg;
   setTimeout(() => { box.style.display = "none"; box.style.background = ""; box.style.borderColor = ""; box.style.color = ""; }, 4000);
+}
+
+/* ---------- 历史会话列表 ---------- */
+
+async function loadSessionList() {
+  try {
+    const data = await api("/api/sessions?limit=50");
+    sessionList = data.sessions || [];
+    renderSessionList();
+  } catch (e) {
+    showError("加载会话列表失败：" + e.message, e.payload);
+  }
+}
+
+function relTime(iso) {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (isNaN(t)) return iso.slice(0, 16);
+  const diff = (Date.now() - t) / 1000;
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return Math.floor(diff / 60) + " 分钟前";
+  if (diff < 86400) return Math.floor(diff / 3600) + " 小时前";
+  if (diff < 86400 * 30) return Math.floor(diff / 86400) + " 天前";
+  return iso.slice(0, 10);
+}
+
+function renderSessionList() {
+  const ul = $("session-list");
+  ul.innerHTML = "";
+  if (!sessionList.length) {
+    const li = document.createElement("li");
+    li.className = "placeholder";
+    li.textContent = "还没有历史会话。发出第一条消息后就会出现在这里。";
+    ul.appendChild(li);
+    return;
+  }
+  sessionList.forEach(s => {
+    const li = document.createElement("li");
+    if (s.session_id === sessionId) li.className = "active";
+
+    const title = document.createElement("div");
+    title.className = "t";
+    title.textContent = s.title || "（无标题）";
+
+    const sub = document.createElement("div");
+    sub.className = "s";
+    sub.innerHTML = "<span>" + escapeHtml(relTime(s.updated_at)) + "</span><span>·</span><span>" +
+                    s.message_count + " 条</span>";
+
+    const del = document.createElement("button");
+    del.className = "del";
+    del.title = "删除这个会话";
+    del.textContent = "✕";
+    del.onclick = (ev) => {
+      ev.stopPropagation();
+      if (confirm("删除会话「" + (s.title || s.session_id) + "」？\n它的原文和摘要会一起删掉。")) {
+        deleteSessionById(s.session_id);
+      }
+    };
+
+    li.appendChild(title);
+    li.appendChild(sub);
+    li.appendChild(del);
+    li.onclick = () => switchSession(s.session_id);
+    ul.appendChild(li);
+  });
+}
+
+async function switchSession(id) {
+  if (id === sessionId) return;
+  setSession(id);
+  await loadHistory(false);
+  renderChatFromState();
+  renderSessionList();
+}
+
+async function deleteSessionById(id) {
+  clearError();
+  const data = await api("/api/sessions/" + encodeURIComponent(id), { method: "DELETE" });
+  setRaw("DELETE /api/sessions/" + id, data);
+  showInfo("删除结果：deleted = " + data.deleted + (data.deleted ? "" : "（本来就不存在，删除是幂等的）"));
+  if (id === sessionId) {
+    state = null;
+    render();
+    $("chat").innerHTML = '<div class="empty">会话已删除（原文和摘要随外键级联清掉了）。</div>';
+  }
+  await loadSessionList();
 }
 
 /* ---------- 发送提问 ---------- */
@@ -307,6 +429,7 @@ async function send(text) {
     appendBubble("assistant", data.answer, data.sources);
     // 再拉一次历史：消解结果、摘要、token 用量只有 /messages 才有
     await loadHistory(true);
+    await loadSessionList();          // 标题和排序会变，顺手刷新左侧列表
   } catch (e) {
     appendBubble("assistant", "（请求失败：" + e.message + "）", null, true);
     showError(e.message, e.payload);
@@ -423,6 +546,8 @@ async function runRegression() {
 /* ---------- 事件绑定 ---------- */
 
 $("btn-new").onclick = () => newSession().catch(e => showError(e.message, e.payload));
+$("btn-new-top").onclick = () => newSession().catch(e => showError(e.message, e.payload));
+$("btn-refresh-list").onclick = () => loadSessionList();
 $("btn-load").onclick = () => loadHistory(false).catch(e => showError(e.message, e.payload));
 $("btn-delete").onclick = () => deleteSession().catch(e => showError(e.message, e.payload));
 $("btn-use").onclick = () => {
@@ -451,6 +576,9 @@ $("question").addEventListener("keydown", (ev) => {
     $("hdr-health").textContent = "连不上";
     showError("连不上后端：" + e.message);
   }
+
+  await loadSessionList();
+
   if (sessionId) {
     await loadHistory(true);
     if (!state) $("chat").innerHTML = '<div class="empty">本地记着的会话在服务端已经不存在（可能被 TTL 清理了）。点「新建会话」开始。</div>';

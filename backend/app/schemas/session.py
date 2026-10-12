@@ -24,6 +24,21 @@ class SessionCreateResponse(BaseModel):
     existed: bool = False        # True 表示该编号本来就存在，直接沿用
 
 
+class SessionSummary(BaseModel):
+    """会话列表里的一项（只带展示需要的字段，不带消息正文）"""
+    session_id: str
+    title: str = ""              # 取首问，供列表展示
+    created_at: str = ""
+    updated_at: str = ""         # 最近一次活动，列表按它倒序
+    message_count: int = 0
+
+
+class SessionListResponse(BaseModel):
+    """历史会话列表响应"""
+    sessions: list[SessionSummary] = []
+    count: int = 0
+
+
 class MessageItem(BaseModel):
     """一条对话记录"""
     role: str                    # user / assistant

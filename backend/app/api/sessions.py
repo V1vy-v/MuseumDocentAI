@@ -14,10 +14,25 @@
 from fastapi import APIRouter, HTTPException
 
 from ..schemas.session import (MessageItem, SessionCreateRequest, SessionCreateResponse,
-                               SessionDeleteResponse, SessionMessagesResponse)
+                               SessionDeleteResponse, SessionListResponse,
+                               SessionMessagesResponse, SessionSummary)
 from ..services import store
 
 router = APIRouter()
+
+
+@router.get("/api/sessions", response_model=SessionListResponse)
+def list_sessions(limit: int = 50, include_empty: bool = False):
+    """列出历史会话（按最近活跃倒序），供界面左侧的会话列表使用。
+
+    默认不返回空会话——新建对话在发出第一条消息之前不该出现在历史里，
+    这和通用聊天应用的行为一致。要连空会话一起看就传 include_empty=true。
+    """
+    sessions = store.list_sessions(limit=limit, include_empty=include_empty)
+    return SessionListResponse(
+        sessions=[SessionSummary(**s) for s in sessions],
+        count=len(sessions),
+    )
 
 
 @router.post("/api/sessions", response_model=SessionCreateResponse)

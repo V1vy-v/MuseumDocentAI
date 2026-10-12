@@ -8,6 +8,7 @@
 #   POST   /api/chat                            文本问答
 #   POST   /api/voice                           语音问答（录音进 → 回答+语音出）
 #   POST   /api/sessions                        新建会话
+#   GET    /api/sessions                        列出历史会话（界面左侧列表用）
 #   GET    /api/sessions/{session_id}/messages  拉取历史（APP 重启后回填界面）
 #   DELETE /api/sessions/{session_id}           清除会话
 #   GET    /api/health                          健康检查（联调时先打这个确认服务活着）

@@ -167,14 +167,26 @@ def get_session(session_id: str) -> dict | None:
         return dict(row) if row else None
 
 
-def list_sessions(limit: int = 50) -> list:
-    """按最近活跃倒序列出会话（前端"历史会话"列表用）"""
+def list_sessions(limit: int = 50, include_empty: bool = False) -> list:
+    """按最近活跃倒序列出会话（历史会话列表用）。
+
+    默认**不返回空会话**（建了但一条消息都没发过的）——和通用聊天应用的行为一致：
+    新建对话在发出第一条消息之前，不该出现在历史列表里。
+
+    updated_at 精度只到秒，同一秒内建的会话会并列，所以再用 rowid 兜一层，
+    保证顺序稳定（否则列表每次刷新都可能换位置）。
+    """
+    sql = (
+        "SELECT s.session_id, s.title, s.created_at, s.updated_at, "
+        "       (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) AS message_count "
+        "FROM sessions s "
+    )
+    if not include_empty:
+        sql += "WHERE EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id) "
+    sql += "ORDER BY s.updated_at DESC, s.rowid DESC LIMIT ?"
+
     with _connect() as conn:
-        rows = conn.execute(
-            "SELECT session_id, title, created_at, updated_at FROM sessions "
-            "ORDER BY updated_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        rows = conn.execute(sql, (max(int(limit), 1),)).fetchall()
         return [dict(r) for r in rows]
 
 

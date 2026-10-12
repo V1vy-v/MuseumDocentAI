@@ -24,6 +24,8 @@ uvicorn app.main:app --reload --port 8000
 - **token 明细**：每条消息的 token 估算值 + 最近一次请求的真实 `prompt_tokens`
   （上下文窗口就是按这些算的，出问题时一眼能看出窗口是怎么切的）
 - **会话管理**：新建 / 载入历史 / 删除，含"删除是幂等的"这类行为验证
+- **左侧历史会话列表**：像通用聊天应用那样列出所有对话（标题取首问、相对时间、
+  消息条数），点一下切换，悬停出删除按钮。空会话（没发过消息的）默认不显示
 - **一键跑指代消解回归**：依次发三句，验证「它」「这个」都能正确指向
 - **原始报文**：最近一次请求与响应，出错时能直接看到后端的 `{error, hint}`
 
@@ -80,12 +82,13 @@ uvicorn app.main:app --reload --port 8000
 | `POST /api/voice` | 语音问答（multipart：`audio` + `session_id`）→ `{question, answer, sources, audio_base64}` | 已在用 |
 | `GET /api/health` | 健康检查 | 联调用 |
 | `POST /api/sessions` | 新建会话 → `{session_id, created_at, existed}` | **可选** |
+| `GET /api/sessions` | 历史会话列表 → `{sessions: [...], count}` | **可选** |
 | `GET /api/sessions/{id}/messages` | 拉取历史 → `{session_id, title, summary, messages[]}` | **可选** |
 | `DELETE /api/sessions/{id}` | 清除会话（幂等，不存在返回 `deleted:false`） | **可选** |
 
 **关键：`/api/chat` 和 `/api/voice` 的入参和回参都没有变**，前端 `ApiClient` 一行都不用改。
 
-会话管理这三个是**可选增强**：`/api/chat`、`/api/voice` 首次写入时会自动建会话，
+会话管理这四个是**可选增强**：`/api/chat`、`/api/voice` 首次写入时会自动建会话，
 所以前端照旧自己生成 UUID、完全不调它们，问答和持久化也正常工作。
 只有当你想实现「重启 APP 后恢复上次对话」时才需要用到：
 

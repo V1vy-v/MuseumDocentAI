@@ -14,17 +14,24 @@
 #
 # 启动时会自动建好会话数据库（backend/data/chat.db），并清理超过 TTL 未活动的旧会话。
 #
-# 自测方法：服务跑起来后打开 http://127.0.0.1:8000/docs
+# 自测入口：
+#   http://127.0.0.1:8000/docs    接口文档（能逐个调接口）
+#   http://127.0.0.1:8000/debug   调试台（连续多轮对话，能看消解结果/摘要/token）
+#
+# 调试台的页面文件在 backend/static/debug.html，纯静态、零构建、无外部依赖。
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .api import chat, sessions, voice
 from .core import config
 from .services import store
+
+DEBUG_PAGE = Path(__file__).resolve().parents[1] / "static" / "debug.html"
 
 
 @asynccontextmanager
@@ -37,6 +44,8 @@ async def lifespan(app: FastAPI):
     removed = store.purge_expired()
     if removed:
         print(f"[启动] 已清理 {removed} 个超过 {config.SESSION_TTL_DAYS} 天未活动的会话")
+    print("[启动] 接口文档 http://127.0.0.1:{}/docs   调试台 http://127.0.0.1:{}/debug"
+          .format(config.PORT, config.PORT))
     yield
 
 
@@ -71,3 +80,18 @@ app.include_router(sessions.router)
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/debug", include_in_schema=False)
+def debug_page():
+    """调试台页面：连续多轮对话，能看到指代消解结果、滚动摘要、token 用量。
+
+    纯静态单文件（backend/static/debug.html），零构建、无外部依赖。
+    页面与接口同源，所以不需要配 CORS。
+    不放进 OpenAPI schema（/docs）里——它是工具，不是对外接口。
+    """
+    if not DEBUG_PAGE.exists():
+        raise HTTPException(status_code=404,
+                            detail={"error": "debug page not found",
+                                    "hint": "缺少文件 backend/static/debug.html"})
+    return FileResponse(DEBUG_PAGE)

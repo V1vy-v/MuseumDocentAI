@@ -56,8 +56,10 @@ def get_messages(session_id: str):
         summary=session.get("summary", ""),
         created_at=session.get("created_at", ""),
         updated_at=session.get("updated_at", ""),
+        last_prompt_tokens=session.get("last_prompt_tokens", 0),
         messages=[MessageItem(role=m["role"], content=m["content"], sources=m["sources"],
-                              created_at=m["created_at"], resolved=m["resolved"])
+                              created_at=m["created_at"], resolved=m["resolved"],
+                              tokens=m["tokens"])
                   for m in messages],
     )
 

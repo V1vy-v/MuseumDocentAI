@@ -31,15 +31,17 @@ class MessageItem(BaseModel):
     sources: list[str] = []      # 该轮回答引用的资料标题
     created_at: str = ""
     resolved: str = ""           # 指代消解后的问句（诊断用，前端可忽略）
+    tokens: int = 0              # 这条消息占多少 token（诊断用：上下文窗口就是按它算的）
 
 
 class SessionMessagesResponse(BaseModel):
     """拉取历史响应"""
     session_id: str
     title: str = ""              # 取首问，供历史列表展示
-    summary: str = ""            # 长对话滚动摘要（阶段四启用后非空）
+    summary: str = ""            # 长对话滚动摘要（对话还短时为空串）
     created_at: str = ""
     updated_at: str = ""
+    last_prompt_tokens: int = 0  # 最近一次请求的真实 prompt token 数（诊断用）
     messages: list[MessageItem] = []
 
 

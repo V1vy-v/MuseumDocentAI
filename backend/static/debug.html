@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>后端调试台 · 博物馆导览问答</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #fff; --line: #e3e6ea; --text: #1f2328;
+    --muted: #6b7280; --accent: #2f6feb; --user: #e8f0fe; --bot: #fff;
+    --warn: #b42318; --ok: #1a7f37; --debug: #fbfbfd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .spacer { flex: 1; }
+  .tag {
+    font-size: 12px; color: var(--muted); background: var(--debug);
+    border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px;
+  }
+  .layout { display: flex; align-items: flex-start; gap: 14px; padding: 14px; }
+  aside { width: 340px; flex: 0 0 340px; display: flex; flex-direction: column; gap: 12px; }
+  main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .card > h2 {
+    font-size: 13px; margin: 0; padding: 9px 12px; border-bottom: 1px solid var(--line);
+    font-weight: 600; display: flex; align-items: center; gap: 8px;
+  }
+  .card > h2 .spacer { flex: 1; }
+  .card .body { padding: 10px 12px; }
+  button {
+    font: inherit; padding: 5px 10px; border: 1px solid var(--line);
+    background: #fff; border-radius: 6px; cursor: pointer; color: var(--text);
+  }
+  button:hover { border-color: #c9ced6; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #2559c9; }
+  button.danger { color: var(--warn); }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=text], textarea {
+    font: inherit; width: 100%; padding: 6px 8px; border: 1px solid var(--line);
+    border-radius: 6px; color: var(--text); background: #fff;
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  .row { display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .kv { display: grid; grid-template-columns: 92px 1fr; gap: 4px 8px; font-size: 13px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; word-break: break-all; }
+  .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  #chat { height: calc(100vh - 300px); min-height: 260px; overflow-y: auto; padding: 12px; }
+  .msg { display: flex; margin-bottom: 12px; }
+  .msg.me { justify-content: flex-end; }
+  .bubble {
+    max-width: 78%; padding: 8px 11px; border-radius: 10px;
+    border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.me .bubble { background: var(--user); }
+  .msg.bot .bubble { background: var(--bot); }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .meta code { background: var(--debug); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }
+  .resolved { color: var(--ok); }
+  .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
+  #summary { white-space: pre-wrap; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  td.tokens { text-align: right; white-space: nowrap; }
+  #error { display: none; margin: 0 14px; padding: 8px 12px; border-radius: 6px;
+           background: #fef3f2; border: 1px solid #fecdca; color: var(--warn); font-size: 13px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  pre { background: var(--debug); border: 1px solid var(--line); border-radius: 6px;
+        padding: 8px; overflow: auto; max-height: 240px; font-size: 12px; margin: 6px 0 0; }
+  .hint { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>后端调试台</h1>
+  <span class="tag">博物馆导览问答</span>
+  <span class="spacer"></span>
+  <span class="tag">会话 <span id="hdr-session" class="mono">—</span></span>
+  <span class="tag">接口 <span id="hdr-health">检测中…</span></span>
+</header>
+
+<div id="error"></div>
+
+<div class="layout">
+  <aside>
+    <section class="card">
+      <h2>会话控制</h2>
+      <div class="body">
+        <label class="hint">会话编号（session_id）</label>
+        <input type="text" id="session-input" class="mono" placeholder="留空则由服务端生成">
+        <div class="row">
+          <button class="primary" id="btn-new">新建会话</button>
+          <button id="btn-load">载入历史</button>
+          <button id="btn-use">用这个编号</button>
+        </div>
+        <div class="row">
+          <button class="danger" id="btn-delete">删除当前会话</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>会话状态</h2>
+      <div class="body">
+        <dl class="kv">
+          <dt>标题</dt><dd id="s-title">—</dd>
+          <dt>创建时间</dt><dd id="s-created" class="mono">—</dd>
+          <dt>更新时间</dt><dd id="s-updated" class="mono">—</dd>
+          <dt>消息条数</dt><dd id="s-count">0</dd>
+          <dt>上次用量</dt><dd id="s-tokens">—</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>滚动摘要 <span class="spacer"></span><span class="hint" id="summary-len"></span></h2>
+      <div class="body"><div id="summary" class="hint">（还没有摘要——对话还短，或尚未跨过压缩阈值）</div></div>
+    </section>
+
+    <section class="card">
+      <h2>消息明细 <span class="spacer"></span><span class="hint">含消解结果与 token</span></h2>
+      <div class="body" style="max-height: 320px; overflow: auto;">
+        <table id="msg-table">
+          <thead><tr><th>#</th><th>角色</th><th>内容 / 消解结果</th><th class="tokens">tok</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </aside>
+
+  <main>
+    <section class="card">
+      <h2>
+        对话
+        <span class="spacer"></span>
+        <button id="btn-regress" title="依次发送三句，验证指代消解（会真实调用模型）">跑指代消解回归（3 轮）</button>
+        <button id="btn-clear-view">只清空显示</button>
+      </h2>
+      <div id="chat"><div class="empty">换个问题开始吧。首句请带上文物名，之后就可以用「它」「这个」追问。</div></div>
+    </section>
+
+    <section class="card">
+      <h2>提问</h2>
+      <div class="body">
+        <textarea id="question" placeholder="例如：越王勾践剑是什么时期的文物？&#10;Enter 发送，Shift+Enter 换行"></textarea>
+        <div class="row">
+          <button class="primary" id="btn-send">发送</button>
+          <span class="hint" id="sending-hint"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>原始报文</h2>
+      <div class="body">
+        <details open>
+          <summary>最近一次请求 / 响应</summary>
+          <pre id="raw">（还没有请求）</pre>
+        </details>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const LS_KEY = "museum_debug_session_id";
+
+let sessionId = localStorage.getItem(LS_KEY) || "";
+let state = null;          // 最近一次 /messages 的响应
+let busy = false;
+
+/* ---------- 基础请求 ---------- */
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const text = await res.text();
+  let data;
+  try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { _raw: text }; }
+
+  if (!res.ok) {
+    // 后端的错误体是平铺的 {error, hint}（见 backend/docs/接口文档.md）
+    const d = data.detail || {};
+    const hint = data.hint || d.hint || data.error || d.error || ("HTTP " + res.status);
+    const err = new Error(hint);
+    err.payload = data;
+    throw err;
+  }
+  return data;
+}
+
+function showError(msg, payload) {
+  const box = $("error");
+  box.style.display = "block";
+  box.textContent = "⚠ " + msg;
+  if (payload) {
+    $("raw").textContent = JSON.stringify(payload, null, 2);
+  }
+}
+
+function clearError() { $("error").style.display = "none"; }
+
+function setRaw(label, obj) {
+  $("raw").textContent = "// " + label + "\n" + JSON.stringify(obj, null, 2);
+}
+
+/* ---------- 会话操作 ---------- */
+
+function setSession(id) {
+  sessionId = id || "";
+  if (sessionId) localStorage.setItem(LS_KEY, sessionId);
+  else localStorage.removeItem(LS_KEY);
+  $("session-input").value = sessionId;
+  $("hdr-session").textContent = sessionId || "—";
+}
+
+async function newSession() {
+  clearError();
+  const data = await api("/api/sessions", { method: "POST" });
+  setRaw("POST /api/sessions", data);
+  setSession(data.session_id);
+  state = null;
+  render();
+  $("chat").innerHTML = '<div class="empty">新会话已建立。开始提问吧。</div>';
+}
+
+async function loadHistory(silent) {
+  if (!sessionId) { if (!silent) showError("还没有会话编号，先点「新建会话」。"); return; }
+  clearError();
+  try {
+    const data = await api("/api/sessions/" + encodeURIComponent(sessionId) + "/messages");
+    state = data;
+    setRaw("GET /api/sessions/" + sessionId + "/messages", data);
+    render();
+  } catch (e) {
+    state = null;
+    render();
+    if (!silent) showError(e.message, e.payload);
+  }
+}
+
+async function deleteSession() {
+  if (!sessionId) { showError("没有可删除的会话。"); return; }
+  clearError();
+  const data = await api("/api/sessions/" + encodeURIComponent(sessionId), { method: "DELETE" });
+  setRaw("DELETE /api/sessions/" + sessionId, data);
+  showInfo(`删除结果：deleted = ${data.deleted}` + (data.deleted ? "" : "（这个会话本来就不存在，删除是幂等的）"));
+  await loadHistory(true);
+  $("chat").innerHTML = '<div class="empty">会话已删除（原文和摘要都随外键级联清掉了）。</div>';
+}
+
+function showInfo(msg) {
+  const box = $("error");
+  box.style.display = "block";
+  box.style.background = "#eef6ee";
+  box.style.borderColor = "#bfe0bf";
+  box.style.color = "#1a7f37";
+  box.textContent = "✓ " + msg;
+  setTimeout(() => { box.style.display = "none"; box.style.background = ""; box.style.borderColor = ""; box.style.color = ""; }, 4000);
+}
+
+/* ---------- 发送提问 ---------- */
+
+async function send(text) {
+  if (busy) return;
+  const question = (text !== undefined ? text : $("question").value).trim();
+  if (!question) return;
+
+  clearError();
+  busy = true;
+  $("btn-send").disabled = true;
+  $("btn-regress").disabled = true;
+  $("sending-hint").textContent = "已发送，等待回答…";
+
+  try {
+    // 没有会话编号就先建一个。否则服务端虽然会自动建会话，
+    // 但那个 id 不会出现在 /api/chat 的响应里，前端就拿不到，
+    // 后面也就拉不到消解结果、摘要和 token 用量。
+    if (!sessionId) {
+      const s = await api("/api/sessions", { method: "POST" });
+      setSession(s.session_id);
+    }
+
+    appendBubble("user", question);
+    if (text === undefined) $("question").value = "";
+
+    const body = { question: question, session_id: sessionId };
+    const data = await api("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(body),
+    });
+    setRaw("POST /api/chat " + JSON.stringify(body), data);
+    appendBubble("assistant", data.answer, data.sources);
+    // 再拉一次历史：消解结果、摘要、token 用量只有 /messages 才有
+    await loadHistory(true);
+  } catch (e) {
+    appendBubble("assistant", "（请求失败：" + e.message + "）", null, true);
+    showError(e.message, e.payload);
+  } finally {
+    busy = false;
+    $("btn-send").disabled = false;
+    $("btn-regress").disabled = false;
+    $("sending-hint").textContent = "";
+  }
+}
+
+/* ---------- 渲染 ---------- */
+
+function appendBubble(role, text, sources, isError) {
+  const chat = $("chat");
+  const empty = chat.querySelector(".empty");
+  if (empty) empty.remove();
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg " + (role === "user" ? "me" : "bot");
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  if (isError) bubble.style.color = "var(--warn)";
+  bubble.textContent = text;
+
+  if (sources && sources.length) {
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.innerHTML = "来源：" + sources.map(s => "<code>" + escapeHtml(s) + "</code>").join(" ");
+    bubble.appendChild(meta);
+  }
+  wrap.appendChild(bubble);
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+  return wrap;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function render() {
+  $("hdr-session").textContent = sessionId || "—";
+  $("session-input").value = sessionId;
+
+  if (!state) {
+    $("s-title").textContent = "—";
+    $("s-created").textContent = "—";
+    $("s-updated").textContent = "—";
+    $("s-count").textContent = "0";
+    $("s-tokens").textContent = "—";
+    $("summary").className = "hint";
+    $("summary").textContent = "（还没有摘要——对话还短，或尚未跨过压缩阈值）";
+    $("summary-len").textContent = "";
+    $("msg-table").querySelector("tbody").innerHTML = "";
+    return;
+  }
+
+  const msgs = state.messages || [];
+  $("s-title").textContent = state.title || "（无）";
+  $("s-created").textContent = state.created_at || "—";
+  $("s-updated").textContent = state.updated_at || "—";
+  $("s-count").textContent = msgs.length;
+  $("s-tokens").textContent = state.last_prompt_tokens
+    ? state.last_prompt_tokens + " prompt token"
+    : "（还没有记录）";
+
+  const sum = $("summary");
+  if (state.summary) {
+    sum.className = "";
+    sum.textContent = state.summary;
+    $("summary-len").textContent = state.summary.length + " 字";
+  } else {
+    sum.className = "hint";
+    sum.textContent = "（还没有摘要——对话还短，或尚未跨过压缩阈值）";
+    $("summary-len").textContent = "";
+  }
+
+  const tbody = $("msg-table").querySelector("tbody");
+  tbody.innerHTML = "";
+  msgs.forEach((m, i) => {
+    const tr = document.createElement("tr");
+    const changed = m.resolved && m.resolved !== m.content;
+    tr.innerHTML =
+      "<td>" + (i + 1) + "</td>" +
+      "<td>" + (m.role === "user" ? "观众" : "讲解员") + "</td>" +
+      "<td>" + escapeHtml(m.content.slice(0, 60)) +
+        (changed ? '<div class="resolved">→ ' + escapeHtml(m.resolved) + "</div>" : "") +
+        (m.sources && m.sources.length ? '<div class="hint">来源 ' + escapeHtml(m.sources.join("、")) + "</div>" : "") +
+      "</td>" +
+      "<td class='tokens'>" + (m.tokens || 0) + "</td>";
+    tbody.appendChild(tr);
+  });
+}
+
+/* ---------- 指代消解回归 ---------- */
+
+const REGRESSION = [
+  "越王勾践剑是什么时期的文物？",
+  "它是什么年代的？",
+  "这个在哪个展厅？",
+];
+
+async function runRegression() {
+  if (busy) return;
+  $("chat").innerHTML = '<div class="empty">正在跑 3 轮回归，每轮都会真实调用模型…</div>';
+  for (const q of REGRESSION) {
+    await send(q);
+    await new Promise(r => setTimeout(r, 300));
+  }
+}
+
+/* ---------- 事件绑定 ---------- */
+
+$("btn-new").onclick = () => newSession().catch(e => showError(e.message, e.payload));
+$("btn-load").onclick = () => loadHistory(false).catch(e => showError(e.message, e.payload));
+$("btn-delete").onclick = () => deleteSession().catch(e => showError(e.message, e.payload));
+$("btn-use").onclick = () => {
+  const v = $("session-input").value.trim();
+  setSession(v);
+  if (v) loadHistory(false).catch(e => showError(e.message, e.payload));
+  else { state = null; render(); }
+};
+$("btn-clear-view").onclick = () => {
+  $("chat").innerHTML = '<div class="empty">已清空显示（服务端的历史没动，点「载入历史」可以取回）。</div>';
+};
+$("btn-send").onclick = () => send();
+$("btn-regress").onclick = () => runRegression();
+
+$("question").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); send(); }
+});
+
+/* ---------- 启动 ---------- */
+
+(async function init() {
+  try {
+    const h = await api("/api/health");
+    $("hdr-health").textContent = h.status === "ok" ? "在线" : JSON.stringify(h);
+  } catch (e) {
+    $("hdr-health").textContent = "连不上";
+    showError("连不上后端：" + e.message);
+  }
+  if (sessionId) {
+    await loadHistory(true);
+    if (!state) $("chat").innerHTML = '<div class="empty">本地记着的会话在服务端已经不存在（可能被 TTL 清理了）。点「新建会话」开始。</div>';
+    else renderChatFromState();
+  }
+})();
+
+function renderChatFromState() {
+  const chat = $("chat");
+  chat.innerHTML = "";
+  (state.messages || []).forEach(m => {
+    if (m.role === "assistant") appendBubble("assistant", m.content, m.sources);
+    else {
+      const wrap = appendBubble("user", m.content);
+      if (m.resolved && m.resolved !== m.content) {
+        const note = document.createElement("div");
+        note.className = "meta resolved";
+        note.textContent = "→ 消解为：" + m.resolved;
+        wrap.querySelector(".bubble").appendChild(note);
+      }
+    }
+  });
+  if (!(state.messages || []).length) {
+    chat.innerHTML = '<div class="empty">这个会话还没有消息。</div>';
+  }
+}
+</script>
+</body>
+</html>

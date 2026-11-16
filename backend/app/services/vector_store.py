@@ -243,8 +243,24 @@ def ensure_ready(force: bool = False) -> bool:
                     pass
                 _initialized = True
 
-            _dim = embeddings.dimension()          # 实测维度，不靠猜
-            _col = _open_or_create(_dim)
+            dim = embeddings.dimension()           # 实测维度，不靠猜
+
+            # 同一个进程里对同一路径再 open 一次会撞 LOCK（实测报
+            # "Can't lock read-write collection"），所以句柄复用：
+            #   - 已经有句柄且维度没变 → 直接复用，只重新同步文件
+            #   - 维度变了 → 不能原地换向量维度，必须重启服务重建
+            if _col is not None:
+                if dim != _dim:
+                    _last_error = (f"向量维度从 {_dim} 变成 {dim}，"
+                                   "需要重启服务以重建索引")
+                    print("[向量库] " + _last_error + " → 暂时退回关键词模式")
+                    return False
+                col = _col
+            else:
+                col = _open_or_create(dim)
+
+            _dim = dim
+            _col = col
             _last_sync = _sync(_col)
             _ready = True
             print("[向量库] 就绪 dim={} 文件={} 本次变更={} 新增块={}"

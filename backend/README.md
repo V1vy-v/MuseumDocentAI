@@ -86,7 +86,7 @@ uvicorn app.main:app --reload --port 8000
 | `app/main.py` | D | 服务入口；启动时建表、清理过期会话、建/更新向量索引（lifespan） |
 | `app/api/` | D | 对外接口：`chat.py` 文本问答、`voice.py` 语音问答、`sessions.py` 会话管理、`kb.py` 资料原文浏览 |
 | `app/services/llm_client.py` | D | 封装 DeepSeek 的调用（文本问答 / 流式 / 摘要 / 语音识别） |
-| `app/services/tts_client.py` | D | 语音合成（当前无可用服务，未配置时只返回文字） |
+| `app/services/tts_client.py` | D | 语音合成（DeepSeek /v1/tools/tts，返回 WAV；失败时降级为只返回文字） |
 | `app/services/rag.py` | C | 检索门面：选路、融合、防幻觉、给出来源与原文链接 |
 | `app/services/vector_store.py` | C | zvec 向量库：建库、增量同步、向量距离闸门 + BM25 混合检索 |
 | `app/services/chunker.py` | C | 把资料按 Markdown 结构切成检索单元 |

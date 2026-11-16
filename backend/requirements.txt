@@ -8,9 +8,9 @@ python-multipart      # 语音接口上传录音文件用
 # zvec 是进程内向量数据库（无服务端），win/cp312 的 whl 约 11 MB，只依赖 numpy
 zvec
 
-# —— 语音合成 ——
-# 目前没有可用的 TTS 服务（见 app/services/tts_client.py 的说明）。
-# 没有 TTS 时 /api/voice 只返回文字，audio_base64 留空，不影响问答。
+# —— 语音 ——
+# 不需要另装：ASR 和 TTS 都走 DeepSeek 的工具接口
+#   /v1/tools/asr（语音识别，multipart 上传）  /v1/tools/tts（语音合成，返回 WAV）
 # 向量化也不需要本地模型：走火山 Ark 的 doubao-embedding-vision（见 core/config.py）
 
 # —— 测试 ——

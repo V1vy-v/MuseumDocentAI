@@ -47,10 +47,10 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 # —— 模型分工（全部走云端 OpenAI 兼容接口，无本地模型依赖）——
-#   文本问答 / 摘要 / 指代消解后的回答 → DeepSeek deepseek-flash
+#   文本问答 / 摘要                  → DeepSeek deepseek-flash
 #   语音识别                        → DeepSeek /v1/tools/asr
+#   语音合成                        → DeepSeek /v1/tools/tts（返回 WAV）
 #   文档向量化                      → 火山 Ark doubao-embedding-vision
-#   语音合成                        → 暂缺（见 TTS_* 配置与 tts_client 的降级说明）
 
 # —— 文本大脑：DeepSeek（首选）——
 # 实测（本机）：GET /models 给出 deepseek-flash / deepseek-v4-pro；
@@ -67,10 +67,15 @@ DEEPSEEK_DISABLE_THINKING = _int_env("DEEPSEEK_DISABLE_THINKING", 1) == 1
 DEEPSEEK_ASR_URL = os.environ.get("DEEPSEEK_ASR_URL",
                                   "https://api.deepseek.com/v1/tools/asr")
 
-# —— 语音合成（可选，当前默认关闭）——
-# 目前手上没有可用的 TTS 服务：火山 Ark 的 /audio/speech 和 /tts 实测都是 404。
-# 这里留一个 OpenAI 兼容 /audio/speech 的通用配置：填了就自动启用；
-# 不填则 /api/voice 只返回文字、audio_base64 留空 —— 不报错、也不丢答案。
+# —— 语音合成（DeepSeek /v1/tools/tts，实测可用）——
+# 请求 {"text": "..."} → 返回 audio/wav（PCM 16bit 单声道 24kHz）。
+# 实测耗时：3 字 1.5s、78 字 3.2s，大头是固定开销。
+# 注意返回的是【流式 WAV】，长度字段是 0xFFFFFFFF，tts_client 会修正后再返回。
+DEEPSEEK_TTS_URL = os.environ.get("DEEPSEEK_TTS_URL",
+                                  "https://api.deepseek.com/v1/tools/tts")
+DEEPSEEK_TTS_VOICE = os.environ.get("DEEPSEEK_TTS_VOICE", "")   # 留空用平台默认音色
+
+# 备选：任意 OpenAI 兼容的 /audio/speech 服务（换供应商时填这几项即可）
 TTS_API_URL = os.environ.get("TTS_API_URL", "")
 TTS_API_KEY = os.environ.get("TTS_API_KEY", "")
 TTS_MODEL = os.environ.get("TTS_MODEL", "")

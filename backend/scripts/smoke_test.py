@@ -13,10 +13,11 @@
 # 第 3 步是关键回归项：改造前 /api/chat 是先检索再取历史，用带代词的原文去检索
 # 必然命中为空，模型会回答「馆内资料暂未收录」——上一轮刚讲过，观众却觉得机器人失忆。
 #
-# 第 4 步的说明：目前没有可用的 TTS 服务，脚本造不出"真的说话"的测试音频。
-#   - 想完整测语音，自己录一段 wav，然后：$env:SMOKE_AUDIO="D:\rec.wav"
-#   - 不提供录音时，脚本会发一段静音，断言接口返回 422「没听清」——
-#     这仍然验证了 ASR 通、以及空识别结果被正确拦住（不会拿空问题去问模型）。
+# 第 4 步的说明：用 DeepSeek 的 TTS 现场合成一句提问语音，再喂给 /api/voice，
+# 所以这是一个真正的语音闭环验证，且在 Windows/Linux/macOS 上都能跑。
+#   - 想用自己的录音测：$env:SMOKE_AUDIO="D:\rec.wav"
+#   - TTS 不可用时退回发送静音，断言接口返回 422「没听清」
+#     （这仍然验证了 ASR 通路和空结果拦截）
 
 import base64
 import io
@@ -31,6 +32,8 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+from app.services import tts_client  # noqa: E402  仅用于"造一句测试提问语音"
 
 BACKEND = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000")
 
@@ -93,11 +96,16 @@ def step4_voice():
         print(f"[4/4] 使用指定录音：{custom}（{len(wav)} 字节）")
         expect_empty = False
     else:
-        wav = _silent_wav()
-        print("[4/4] 未指定 SMOKE_AUDIO，发送静音音频（用于验证 ASR 通路与空结果拦截）")
-        expect_empty = True
+        try:
+            wav = tts_client.synthesize("越王勾践剑是什么年代的")
+            print(f"[4/4] 已用 TTS 合成测试提问「越王勾践剑是什么年代的」（{len(wav)} 字节）")
+            expect_empty = False
+        except tts_client.TTSUnavailable as exc:
+            wav = _silent_wav()
+            print(f"[4/4] TTS 不可用（{exc}），改发静音音频验证 ASR 通路")
+            expect_empty = True
 
-    r = requests.post(BACKEND + "/api/voice", timeout=180,
+    r = requests.post(BACKEND + "/api/voice", timeout=240,
                       files={"audio": ("question.wav", wav, "audio/wav")},
                       data={"session_id": "smoke-voice-" + uuid.uuid4().hex[:8]})
 
@@ -114,12 +122,15 @@ def step4_voice():
     data = r.json()
     print("      识别到的提问:", data.get("question", "(无)"))
     print("      回答:", data["answer"][:80])
+    print("      来源:", data.get("sources"))
+    if data.get("question") and "勾践" not in data["question"]:
+        raise AssertionError("识别结果和合成的提问对不上，ASR 可能有问题")
     if data.get("audio_base64"):
-        a_path = Path(tempfile.gettempdir()) / "smoke_answer.bin"
+        a_path = Path(tempfile.gettempdir()) / "smoke_answer.wav"
         a_path.write_bytes(base64.b64decode(data["audio_base64"]))
-        print(f"      播报语音已保存: {a_path}")
+        print(f"      播报语音已保存: {a_path}（{a_path.stat().st_size} 字节）")
     else:
-        print("      没有播报语音（当前未配置 TTS 服务，属预期）")
+        print("      没有播报语音（TTS 合成失败，已降级为只返回文字）")
     print("[4/4] 语音闭环 ✓")
 
 

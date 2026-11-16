@@ -11,6 +11,17 @@
     <string name="source_label">来源：%1$s</string>
     <string name="voice_message_label">🎤 语音提问</string>
 
+    <!-- ====== 标题栏：语音播报开关 / 服务器设置 ====== -->
+    <string name="voice_reply_label">语音播报</string>
+    <string name="btn_settings">服务器</string>
+    <string name="dialog_server_title">后端服务地址</string>
+    <string name="dialog_server_message">真机测试请填电脑的局域网 IP（电脑用 ipconfig 查看）\n模拟器可以留空，自动使用 10.0.2.2 或 127.0.0.1\n示例：http://192.168.1.5:8000</string>
+    <string name="dialog_server_hint">http://192.168.1.5:8000</string>
+    <string name="dialog_ok">保存</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="toast_server_saved">已保存，下次提问生效</string>
+    <string name="toast_tts_failed">语音播报失败，仅显示文字</string>
+
     <!-- ====== 提示信息（Toast / 错误气泡） ====== -->
     <string name="toast_permission_denied">需要麦克风权限才能语音提问</string>
     <string name="toast_record_too_short">说话时间太短，请重试</string>

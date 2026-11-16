@@ -50,8 +50,12 @@ public class ApiClient implements ChatApi {
             "http://127.0.0.1:8000",
     };
 
-    /** 记住第一个连通的地址，后续请求直接用它 */
+    /** 记住第一个连通的地址，后续请求直接用它（也会被用户手填的地址覆盖） */
     private static volatile String workingBaseUrl = null;
+
+    /** 本地设置文件名与键（保存用户手填的服务器地址与语音播报开关） */
+    private static final String PREFS_NAME = "docent_prefs";
+    private static final String KEY_SERVER_URL = "server_url";
 
     /** 超时时间：连不上 10 秒算失败；等待回答最长 60 秒 */
     private static final int CONNECT_TIMEOUT_MS = 10000;
@@ -67,6 +71,50 @@ public class ApiClient implements ChatApi {
 
     public ApiClient(Context context) {
         this.context = context.getApplicationContext();
+        loadServerUrl();
+    }
+
+    // ======== 服务器地址设置（真机测试时填电脑的局域网 IP） ========
+
+    @Override
+    public void setServerUrl(String url) {
+        String normalized = normalizeUrl(url);
+        workingBaseUrl = normalized.isEmpty() ? null : normalized;
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putString(KEY_SERVER_URL, normalized).apply();
+    }
+
+    @Override
+    public String getServerUrl() {
+        String saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_SERVER_URL, "");
+        return saved == null ? "" : saved;
+    }
+
+    /** 启动时读回上次保存的地址；没保存过就保持"自动尝试" */
+    private void loadServerUrl() {
+        String saved = getServerUrl();
+        if (!saved.isEmpty()) {
+            workingBaseUrl = saved;
+        }
+    }
+
+    /** 把用户输入整理成标准地址：补 http://、去空格、去末尾斜杠；空串表示自动 */
+    private static String normalizeUrl(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String url = raw.trim();
+        if (url.isEmpty() || "自动".equals(url)) {
+            return "";
+        }
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://" + url;
+        }
+        while (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        return url;
     }
 
     // ======== 对外的两个请求（见 ChatApi 约定） ========
@@ -102,8 +150,41 @@ public class ApiClient implements ChatApi {
         });
     }
 
-    // ======== 请求的发送细节 ========
+    @Override
+    public void synthesize(String text, TtsCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("text", text);
+                String responseText = postJson("/api/tts", body.toString());
+                JSONObject json = new JSONObject(responseText);
+                if (json.has("error")) {
+                    String hint = json.optString("hint", "");
+                    deliverTtsFailure(callback, hint.isEmpty()
+                            ? context.getString(R.string.toast_tts_failed) : hint);
+                    return;
+                }
+                String base64 = json.optString("audio_base64", "");
+                if (base64.isEmpty()) {
+                    deliverTtsFailure(callback, context.getString(R.string.toast_tts_failed));
+                    return;
+                }
+                final byte[] audio = Base64.decode(base64, Base64.DEFAULT);
+                mainHandler.post(() -> callback.onAudio(audio));
+            } catch (IOException e) {
+                deliverTtsFailure(callback, context.getString(R.string.toast_tts_failed));
+            } catch (JSONException e) {
+                deliverTtsFailure(callback, context.getString(R.string.toast_tts_failed));
+            }
+        });
+    }
 
+    /** 把语音合成的失败切回主线程交给界面 */
+    private void deliverTtsFailure(TtsCallback callback, String message) {
+        mainHandler.post(() -> callback.onFailure(message));
+    }
+
+    // ======== 请求的发送细节 ========
     /** 打开一个到后端的连接（统一设置超时） */
     private HttpURLConnection openConnection(String baseUrl, String path) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + path).openConnection();

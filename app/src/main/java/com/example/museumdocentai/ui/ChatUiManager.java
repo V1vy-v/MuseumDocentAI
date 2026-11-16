@@ -1,6 +1,9 @@
 package com.example.museumdocentai.ui;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.view.View;
@@ -11,6 +14,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -50,6 +54,12 @@ public class ChatUiManager {
     private final EditText editQuestion;
     private final Button btnSend;
     private final Button btnMic;
+    private final SwitchCompat switchVoice;
+    private final Button btnSettings;
+
+    /** 本地设置：记住"语音播报"开关的状态 */
+    private static final String PREFS_NAME = "docent_prefs";
+    private static final String KEY_VOICE_REPLY = "voice_reply";
 
     // 对话数据与它的"画笔"
     private final List<ChatMessage> messages = new ArrayList<>();
@@ -88,6 +98,54 @@ public class ChatUiManager {
         apiClient = new ApiClient(activity);
         player = new AudioPlayer(activity);
         recorder = new VoiceRecorder(activity, recorderListener);
+
+        // 顶部"语音播报"开关：默认打开，关掉后只显示文字不朗读
+        switchVoice = activity.findViewById(R.id.switch_voice);
+        btnSettings = activity.findViewById(R.id.btn_settings);
+        switchVoice.setChecked(isVoiceReplyEnabled());
+        switchVoice.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            setVoiceReplyEnabled(isChecked);
+            if (!isChecked && player.isPlaying()) {
+                player.stop();       // 关掉开关时立刻停止正在播放的语音
+            }
+        });
+
+        // 顶部"服务器"按钮：改后端地址（真机测试要填电脑的局域网 IP）
+        btnSettings.setOnClickListener(v -> showServerDialog());
+    }
+
+    // ================== 设置：语音播报开关 / 服务器地址 ==================
+
+    /** 语音播报是否打开（用户的选择会记住，下次启动沿用） */
+    private boolean isVoiceReplyEnabled() {
+        return prefs().getBoolean(KEY_VOICE_REPLY, true);
+    }
+
+    private void setVoiceReplyEnabled(boolean enabled) {
+        prefs().edit().putBoolean(KEY_VOICE_REPLY, enabled).apply();
+    }
+
+    private SharedPreferences prefs() {
+        return activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    }
+
+    /** 弹窗填写后端地址；留空表示自动（模拟器默认地址） */
+    private void showServerDialog() {
+        final EditText input = new EditText(activity);
+        input.setHint(R.string.dialog_server_hint);
+        input.setText(apiClient.getServerUrl());
+        input.setSingleLine(true);
+
+        new AlertDialog.Builder(activity)
+                .setTitle(R.string.dialog_server_title)
+                .setMessage(R.string.dialog_server_message)
+                .setView(input)
+                .setPositiveButton(R.string.dialog_ok, (dialog, which) -> {
+                    apiClient.setServerUrl(input.getText().toString());
+                    showToast(activity.getString(R.string.toast_server_saved));
+                })
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show();
     }
 
     // ================== 对外入口（MainActivity 转发） ==================
@@ -153,9 +211,16 @@ public class ChatUiManager {
                 refreshMessage(pending);
                 scrollToBottom();
                 hideStatus();
-                // 后端带回回答音频就播出来（audio 为空表示不播报，正常情况）
+                // 语音播报开关关掉：只显示文字，不播放任何声音
+                if (!isVoiceReplyEnabled()) {
+                    return;
+                }
                 if (audio != null && audio.length > 0) {
+                    // 语音提问：后端把答案音频一起带回来了，直接播
                     player.play(audio, playbackListener);
+                } else if (answer != null && !answer.isEmpty()) {
+                    // 文字提问：后端只返回文字，再调 /api/tts 把回答读出来
+                    speak(answer);
                 }
             }
 
@@ -176,6 +241,24 @@ public class ChatUiManager {
         } else {
             apiClient.sendText(question, sessionId, callback);
         }
+    }
+
+    /** 把一段回答文字合成语音并播放（文字提问时用；失败只提示，不影响看文字答案） */
+    private void speak(String text) {
+        apiClient.synthesize(text, new ChatApi.TtsCallback() {
+            @Override
+            public void onAudio(byte[] audio) {
+                // 合成期间用户可能把开关关掉了，再确认一次
+                if (audio != null && audio.length > 0 && isVoiceReplyEnabled()) {
+                    player.play(audio, playbackListener);
+                }
+            }
+
+            @Override
+            public void onFailure(String message) {
+                showToast(message);
+            }
+        });
     }
 
     // ================== 录音的回调（VoiceRecorder 送来） ==================

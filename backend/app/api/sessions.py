@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException
 from ..schemas.session import (MessageItem, SessionCreateRequest, SessionCreateResponse,
                                SessionDeleteResponse, SessionListResponse,
                                SessionMessagesResponse, SessionSummary)
-from ..services import store
+from ..services import rag, store
 
 router = APIRouter()
 
@@ -72,7 +72,10 @@ def get_messages(session_id: str):
         created_at=session.get("created_at", ""),
         updated_at=session.get("updated_at", ""),
         last_prompt_tokens=session.get("last_prompt_tokens", 0),
+        # sources_detail 由入库的标题现算：库里只存了标题，原文链接是检索时
+        # 才算出来的、没落库。不回填这一下，重启后来源气泡就点不开了。
         messages=[MessageItem(role=m["role"], content=m["content"], sources=m["sources"],
+                              sources_detail=rag.sources_detail(m["sources"]),
                               created_at=m["created_at"], resolved=m["resolved"],
                               tokens=m["tokens"])
                   for m in messages],

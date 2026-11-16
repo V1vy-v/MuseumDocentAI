@@ -100,16 +100,59 @@ def catalog() -> list:
     不读索引，直接扫目录：这样向量库没就绪时也能用，而且永远是实时的
     （角色 C 新加一份资料，清单立刻多一条，不需要重建任何东西）。
     """
+    titles = []
+    for title, _ in _scan_kb():
+        if title and title not in titles:
+            titles.append(title)
+    return titles
+
+
+def _scan_kb() -> list:
+    """扫知识库，返回 [(规范化标题, 相对路径)]"""
     kb_dir = Path(config.KNOWLEDGE_BASE_DIR)
     if not kb_dir.exists():
         return []
-    titles = []
+    out = []
     for path in sorted(kb_dir.glob("**/*")):
         if not path.is_file() or path.suffix.lower() not in (".md", ".txt"):
             continue
         if path.name.upper() == "README.MD":
             continue
-        title = coreference.normalize_title(path.stem)
-        if title and title not in titles:
-            titles.append(title)
-    return titles
+        out.append((coreference.normalize_title(path.stem),
+                    path.relative_to(kb_dir).as_posix()))
+    return out
+
+
+def doc_index() -> dict:
+    """标题 → 资料相对路径。
+
+    同时登记"规范化标题"和"原始文件名"两种键：修复前存进库的老消息，
+    标题还是带「示例_」前缀的原始文件名，只认一种键就会找不到原文。
+    """
+    index = {}
+    kb_dir = Path(config.KNOWLEDGE_BASE_DIR)
+    for title, rel in _scan_kb():
+        index.setdefault(title, rel)
+        index.setdefault(Path(rel).stem, rel)
+    return index
+
+
+def sources_detail(titles) -> list:
+    """把入库时只存下来的【标题】还原成带原文链接的来源列表。
+
+    为什么需要：回答入库时只存了标题字符串（`sources` 列），`url` 是检索时
+    现算的，没落库。所以 APP/调试台重启后回填历史时，如果不还原一下，
+    来源气泡就退化成点不开的纯文本了。
+
+    返回格式与流式 `meta.sources_detail` 完全一致，前端可以复用同一套渲染。
+    heading 找不回来（它属于当次检索的上下文），留空即可。
+    """
+    index = doc_index()
+    out = []
+    for title in titles or []:
+        rel = index.get(title, "")
+        out.append({"title": title,
+                    "heading": "",
+                    "url": _url(rel) if rel else "",
+                    "score": 0})
+    return out

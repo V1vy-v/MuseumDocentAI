@@ -752,8 +752,17 @@ function renderChatFromState() {
   const chat = $("chat");
   chat.innerHTML = "";
   (state.messages || []).forEach(m => {
-    if (m.role === "assistant") appendBubble("assistant", m.content, m.sources);
-    else addResolvedNote(appendBubble("user", m.content), m.resolved, m.content);
+    if (m.role !== "assistant") {
+      addResolvedNote(appendBubble("user", m.content), m.resolved, m.content);
+      return;
+    }
+    // 历史消息优先用 sources_detail（带原文链接，能点开）；
+    // 老数据没有它，就退回字符串标题，照样显示但不带链接。
+    const wrap = appendBubble("assistant", m.content, null);
+    const detail = (m.sources_detail && m.sources_detail.length)
+      ? m.sources_detail
+      : (m.sources || []).map(t => ({ title: t, heading: "", url: "" }));
+    if (detail.length) setSourcePills(wrap.querySelector(".bubble"), detail);
   });
   if (!(state.messages || []).length) {
     chat.innerHTML = '<div class="empty">这个会话还没有消息。</div>';

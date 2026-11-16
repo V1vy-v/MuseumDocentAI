@@ -39,11 +39,23 @@ class SessionListResponse(BaseModel):
     count: int = 0
 
 
+class SourceItem(BaseModel):
+    """一条来源资料（带原文链接）。
+
+    和流式响应 `meta.sources_detail` 的形状保持一致，前端可以复用同一套渲染。
+    """
+    title: str = ""
+    heading: str = ""            # 命中的小节（历史消息里找不回来，会是空串）
+    url: str = ""                # 原文地址，可直接点开；空串表示原文已不在
+    score: float = 0.0           # 排序分（历史消息里是 0）
+
+
 class MessageItem(BaseModel):
     """一条对话记录"""
     role: str                    # user / assistant
     content: str                 # 用户原话或模型回答（保真，未经改写）
     sources: list[str] = []      # 该轮回答引用的资料标题
+    sources_detail: list[SourceItem] = []   # 同上，但带原文链接（前端做"点开看原文"用）
     created_at: str = ""
     resolved: str = ""           # 指代消解后的问句（诊断用，前端可忽略）
     tokens: int = 0              # 这条消息占多少 token（诊断用：上下文窗口就是按它算的）

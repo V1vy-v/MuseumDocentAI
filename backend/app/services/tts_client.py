@@ -12,6 +12,10 @@
 # 调用方（api/voice.py）必须捕获它、返回文字答案 + 空音频，
 # 而不是让整个请求 502 —— 否则"语音播报失败"会连"已经生成好的回答"一起丢掉。
 
+import requests
+
+from ..core import config
+
 
 class TTSUnavailable(RuntimeError):
     """没有可用的 TTS 服务，或合成失败。调用方应降级为"只返回文字"。"""

@@ -222,6 +222,39 @@ class VoiceFlowTest(FlowTestCase):
             asyncio.run(voice(audio=_FakeUpload(b""), session_id=self.sid))
         self.assertEqual(ctx.exception.status_code, 400)
 
+    def test_voice_survives_tts_unavailable(self):
+        """没有 TTS 服务时，回答必须照常返回，只是没有音频。
+
+        这条是补的：重写 tts_client 时漏了 import config，
+        上面几个用例都把 synthesize mock 掉了，所以单测全绿，
+        真实语音请求却 500。这里刻意让它真的走降级分支。
+        """
+        with mock.patch.object(llm_client, "transcribe", return_value=EXPECTED_QUERY), \
+             mock.patch.object(rag, "retrieve", return_value=[SOURCE]), \
+             mock.patch.object(llm_client, "chat_reply", return_value=("春秋晚期。", USAGE)), \
+             mock.patch.object(tts_client, "synthesize",
+                               side_effect=tts_client.TTSUnavailable("未配置 TTS")):
+            resp = asyncio.run(voice(audio=_FakeUpload(b"RIFFwav"), session_id=self.sid))
+
+        self.assertEqual(resp.answer, "春秋晚期。", "语音合成失败不能连累回答")
+        self.assertEqual(resp.audio_base64, "", "没有音频时应给空串，而不是报错")
+        # 这一轮必须落库，否则观众接着问"它"就断片了。
+        # setUp 里铺了 2 条上文，这轮再加 2 条。
+        msgs = store.fetch_messages(self.sid)
+        self.assertEqual(len(msgs), 4)
+        self.assertEqual(msgs[-1]["content"], "春秋晚期。")
+
+    def test_voice_rejects_empty_transcript(self):
+        """ASR 没听清时返回 422，不能拿空问题去问模型"""
+        from fastapi import HTTPException
+        with mock.patch.object(llm_client, "transcribe", return_value="   "), \
+             mock.patch.object(llm_client, "chat_reply") as mocked:
+            with self.assertRaises(HTTPException) as ctx:
+                asyncio.run(voice(audio=_FakeUpload(b"RIFFsilence"), session_id=self.sid))
+
+        self.assertEqual(ctx.exception.status_code, 422)
+        mocked.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

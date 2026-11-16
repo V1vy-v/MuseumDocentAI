@@ -145,6 +145,7 @@ class RouteRegistrationTest(unittest.TestCase):
         "/api/chat": {"post"},
         "/api/chat/stream": {"post"},
         "/api/voice": {"post"},
+        "/api/tts": {"post"},
         "/api/health": {"get"},
         "/api/sessions": {"get", "post"},
         "/api/sessions/{session_id}/messages": {"get"},

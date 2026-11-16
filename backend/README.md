@@ -53,6 +53,8 @@ uvicorn app.main:app --port 8000     # 开发时可以加 --reload
 - **语音提问**：点「🎤 语音提问」开始录音，再点一次结束并提交。
   浏览器录的是 webm，页面会先在本地转成 16kHz WAV 再发给 `/api/voice`，
   所以整条语音链路（识别 → 检索 → 回答 → 播报）都能在调试台里直接试听
+- **语音输出**：每条回答下面有个「🔊 朗读」，点一下就走 `/api/tts` 合成并播放；
+  勾上「自动朗读」则回答一生成完就自动出声（包括流式输出）
 - **来源气泡**：命中馆内资料时，回答下方出现灰色小胶囊，点开就是资料原文
 - **原始报文**：最近一次请求与响应，出错时能直接看到后端的 `{error, hint}`
 
@@ -114,7 +116,8 @@ uvicorn app.main:app --reload --port 8000
 |---|---|---|
 | `POST /api/chat` | 文本问答 `{question, session_id}` → `{answer, sources}` | 已在用 |
 | `POST /api/chat/stream` | **流式问答（SSE）**：`meta` → `delta`* → `done`/`error` | **可选**（接了才有打字机效果） |
-| `POST /api/voice` | 语音问答（multipart：`audio` + `session_id`）→ `{question, answer, sources, audio_base64}` | 已在用 |
+| `POST /api/voice` | 语音问答（multipart：`audio` + `session_id`）→ `{question, answer, sources, sources_detail, audio_base64}` | 已在用 |
+| `POST /api/tts` | 文字转语音 `{text}` → `{audio_base64, format}`，给"文本回答也朗读"用 | **可选** |
 | `GET /api/health` | 健康检查（附带向量索引状态：就绪 / 关键词降级） | 联调用 |
 | `GET /api/kb/{路径}` | 资料原文（`sources` 对应的 Markdown 渲染页，只读） | 不用调（调试台点来源气泡时用） |
 | `POST /api/sessions` | 新建会话 → `{session_id, created_at, existed}` | **可选** |

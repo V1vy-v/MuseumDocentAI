@@ -107,6 +107,14 @@
   .src-pill .sec { opacity: .65; margin-left: 4px; }
   /* 录音中：按钮变红，给出明确的"正在录"反馈 */
   #btn-mic.recording { background: #fdecea; border-color: #f5b5ae; color: #b42318; }
+  /* 每条回答下面的小喇叭 */
+  .bubble-foot { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+  .speak-btn {
+    font-size: 11px; line-height: 1.5; color: var(--muted); background: var(--debug);
+    border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; cursor: pointer;
+  }
+  .speak-btn:hover { border-color: #b9b1a6; color: #6b635a; }
+  .speak-btn[disabled] { opacity: .55; cursor: default; }
   .resolved { color: var(--ok); }
   .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
   #summary { white-space: pre-wrap; font-size: 13px; }
@@ -166,6 +174,9 @@
           <button id="btn-mic" title="点一下开始录音，再点一下结束并提交（需要麦克风权限）">🎤 语音提问</button>
           <label class="chk" title="走 POST /api/chat/stream，边生成边显示">
             <input type="checkbox" id="chk-stream" checked> 流式输出
+          </label>
+          <label class="chk" title="回答生成完后自动朗读（调用 POST /api/tts）">
+            <input type="checkbox" id="chk-speak"> 自动朗读
           </label>
           <span class="hint" id="sending-hint"></span>
         </div>
@@ -403,6 +414,9 @@ async function switchSession(id) {
 
 async function deleteSessionById(id) {
   clearError();
+  // 删除是不可撤销的（消息随外键级联清掉），所以先确认一次。
+  // 这里存的是真实对话记录，误点一下代价太大。
+  if (!confirm("确定删除会话「" + id + "」及其全部消息吗？\n删除后无法恢复。")) return;
   const data = await api("/api/sessions/" + encodeURIComponent(id), { method: "DELETE" });
   setRaw("DELETE /api/sessions/" + id, data);
   showInfo("删除结果：deleted = " + data.deleted + (data.deleted ? "" : "（本来就不存在，删除是幂等的）"));
@@ -439,12 +453,14 @@ async function send(text) {
     const userBubble = appendBubble("user", question);
     if (text === undefined) $("question").value = "";
 
+    let answerText = "";
     if ($("chk-stream").checked) {
       // 流式：先放一个空气泡，边收边往里追加
       const botBubble = appendBubble("assistant", "");
       const info = await streamAnswer(question, botBubble);
       addTiming(botBubble, info);
       addResolvedNote(userBubble, info.resolved, question);
+      answerText = info.answer;
     } else {
       const body = { question: question, session_id: sessionId };
       const data = await api("/api/chat", {
@@ -454,7 +470,11 @@ async function send(text) {
       });
       setRaw("POST /api/chat " + JSON.stringify(body), data);
       appendBubble("assistant", data.answer, data.sources);
+      answerText = data.answer;
     }
+
+    // 自动朗读：音频播放和 DOM 重绘互不影响，所以放在重绘之前触发也没问题
+    if ($("chk-speak").checked && answerText) speak(answerText, null);
 
     // 再拉一次历史：消解结果、摘要、token 用量只有 /messages 才有
     await loadHistory(true);
@@ -576,8 +596,7 @@ function appendBubble(role, text, sources, isError) {
   return wrap;
 }
 
-function setSources(bubble, sources) {
-  let meta = bubble.querySelector(".meta.sources");
+function setSources(bubble, sources) {  let meta = bubble.querySelector(".meta.sources");
   if (!meta) {
     meta = document.createElement("div");
     meta.className = "meta sources";
@@ -602,6 +621,50 @@ function setSourcePills(bubble, detail) {
     return '<a class="src-pill" href="' + escapeHtml(s.url) + '" target="_blank" rel="noopener"'
          + ' title="' + escapeHtml(tip) + '，点击查看原文">' + title + sec + "</a>";
   }).join("");
+}
+
+/* ---------- 语音输出：任意回答都能朗读 ---------- */
+
+function playAudio(b64) {
+  if (!b64) return null;
+  const audio = new Audio("data:audio/wav;base64," + b64);
+  audio.play().catch(() => { /* 浏览器可能拦截自动播放，忽略即可 */ });
+  return audio;
+}
+
+async function speak(text, btn) {
+  if (!text || !text.trim()) return;
+  const label = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "合成中…"; }
+  try {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ text: text }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.hint || data.error || ("HTTP " + res.status));
+    playAudio(data.audio_base64);
+  } catch (e) {
+    showError("朗读失败：" + e.message, null);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label || "🔊"; }
+  }
+}
+
+/* 给一条回答气泡挂上小喇叭（已经挂过就不重复挂） */
+function addSpeakButton(bubble, text) {
+  if (!bubble || !text || !text.trim()) return;
+  if (bubble.querySelector(".bubble-foot")) return;
+  const foot = document.createElement("div");
+  foot.className = "bubble-foot";
+  const btn = document.createElement("button");
+  btn.className = "speak-btn";
+  btn.textContent = "🔊 朗读";
+  btn.title = "调用 POST /api/tts 朗读这段回答";
+  btn.onclick = (ev) => { ev.stopPropagation(); speak(text, btn); };
+  foot.appendChild(btn);
+  bubble.appendChild(foot);
 }
 
 function appendText(wrap, piece) {
@@ -911,6 +974,7 @@ function renderChatFromState() {
       ? m.sources_detail
       : (m.sources || []).map(t => ({ title: t, heading: "", url: "" }));
     if (detail.length) setSourcePills(wrap.querySelector(".bubble"), detail);
+    addSpeakButton(wrap.querySelector(".bubble"), m.content);
   });
   if (!(state.messages || []).length) {
     chat.innerHTML = '<div class="empty">这个会话还没有消息。</div>';

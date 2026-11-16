@@ -28,7 +28,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .api import chat, kb, sessions, voice
+from .api import chat, kb, sessions, tts, voice
 from .core import config
 from .services import llm_client, store, vector_store
 
@@ -82,6 +82,7 @@ async def flatten_http_error(request: Request, exc: StarletteHTTPException):
 
 app.include_router(chat.router)
 app.include_router(voice.router)
+app.include_router(tts.router)
 app.include_router(sessions.router)
 app.include_router(kb.router)
 

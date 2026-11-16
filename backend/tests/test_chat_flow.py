@@ -256,5 +256,31 @@ class VoiceFlowTest(FlowTestCase):
         mocked.assert_not_called()
 
 
+class TtsApiTest(unittest.TestCase):
+    """/api/tts 的错误分支（不联网）"""
+
+    def test_empty_text_is_rejected(self):
+        from fastapi import HTTPException
+        from app.api.tts import synthesize
+        from app.schemas.chat import TtsRequest
+
+        with self.assertRaises(HTTPException) as ctx:
+            synthesize(TtsRequest(text="   "))
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    def test_unavailable_tts_returns_503(self):
+        """TTS 不可用要报 503 而不是 500 —— 这是"服务暂时没有"，不是代码错了"""
+        from fastapi import HTTPException
+        from app.api.tts import synthesize
+        from app.schemas.chat import TtsRequest
+
+        with mock.patch.object(tts_client, "synthesize",
+                               side_effect=tts_client.TTSUnavailable("没配")):
+            with self.assertRaises(HTTPException) as ctx:
+                synthesize(TtsRequest(text="读点东西"))
+        self.assertEqual(ctx.exception.status_code, 503)
+        self.assertEqual(ctx.exception.detail["hint"], "语音播报暂时不可用，文字回答不受影响")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

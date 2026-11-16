@@ -35,3 +35,14 @@ class ErrorResponse(BaseModel):
     """统一错误格式"""
     error: str                       # 错误说明（给开发看）
     hint: str                        # 给用户看的友好提示
+
+
+class TtsRequest(BaseModel):
+    """语音合成请求"""
+    text: str                        # 要朗读的文本
+
+
+class TtsResponse(BaseModel):
+    """语音合成响应"""
+    audio_base64: str = ""           # WAV 音频的 base64（可直接 data:audio/wav;base64, 播放）
+    format: str = "wav"              # 音频格式，目前固定 wav

@@ -9,6 +9,8 @@
 # 实测（本机）：一次请求可以带多段文本，返回 2048 维。
 # 注意返回的 data 不保证顺序 —— 按 index 排回去，否则向量和文本会错配。
 
+import time
+
 import requests
 
 from ..core import config
@@ -31,21 +33,39 @@ def _headers() -> dict:
 
 
 def _embed_batch(texts: list) -> list:
-    """一次 HTTP 请求做一批，返回与 texts 顺序一致的向量列表"""
+    """一次 HTTP 请求做一批，返回与 texts 顺序一致的向量列表
+
+    平台有频率限制（实测大批量建库会返回 429 AccountRateLimitExceeded），
+    所以这里遇到 429/5xx 就指数退避重试，而不是让整个建库失败。
+    """
     if not texts:
         return []
     if not config.ARK_API_KEY:
         raise EmbeddingError("未配置 ARK_API_KEY")
 
-    resp = requests.post(
-        config.ARK_BASE_URL.rstrip("/") + "/embeddings",
-        headers=_headers(),
-        json={"model": config.ARK_EMBED_MODEL, "input": texts},
-        timeout=_TIMEOUT,
-    )
-    if resp.status_code >= 400:
-        # 把平台返回的原文带出来，否则排查时只能看到 400
+    attempts = max(config.EMBED_RETRIES, 1)
+    last_error = ""
+    resp = None
+    for attempt in range(attempts):
+        resp = requests.post(
+            config.ARK_BASE_URL.rstrip("/") + "/embeddings",
+            headers=_headers(),
+            json={"model": config.ARK_EMBED_MODEL, "input": texts},
+            timeout=_TIMEOUT,
+        )
+        if resp.status_code < 400:
+            break
+        if resp.status_code == 429 or resp.status_code >= 500:
+            # 退避：1,2,4,8,16,30 秒（上限 30）
+            wait = min(2 ** attempt, 30)
+            last_error = f"embedding HTTP {resp.status_code}: {resp.text[:200]}"
+            print(f"[向量化] 被限流/服务繁忙，{wait}s 后重试（{attempt + 1}/{attempts}）", flush=True)
+            time.sleep(wait)
+            continue
+        # 其它 4xx 是请求本身有问题，重试没用
         raise EmbeddingError(f"embedding HTTP {resp.status_code}: {resp.text[:300]}")
+    else:
+        raise EmbeddingError(f"embedding 重试 {attempts} 次仍失败：{last_error}")
 
     try:
         data = resp.json().get("data") or []
@@ -66,10 +86,13 @@ def _embed_batch(texts: list) -> list:
 
 
 def embed_documents(texts: list) -> list:
-    """文档批量向量化（按 EMBED_BATCH 分批，避免一次请求过大）"""
+    """文档批量向量化（按 EMBED_BATCH 分批，批间留间隔避开频率限制）"""
     out = []
     batch = max(config.EMBED_BATCH, 1)
+    delay = max(getattr(config, "EMBED_DELAY_SECONDS", 0.0), 0.0)
     for start in range(0, len(texts), batch):
+        if start and delay:
+            time.sleep(delay)
         out.extend(_embed_batch(texts[start:start + batch]))
     return out
 

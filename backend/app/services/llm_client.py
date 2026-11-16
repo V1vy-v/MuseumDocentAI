@@ -155,12 +155,23 @@ def _build_messages(question: str, history: list, sources: list, summary: str,
 
     # 馆藏清单：解决"你们馆有什么文物"这类【元问题】。
     # 元问题的答案就是资料目录本身，任何检索都返回不了，只能靠这份清单。
+    #
+    # 必须限量：知识库接入全国资料馆后资料有 4000+ 份，整份清单塞进提示词
+    # 会让每次请求多出三四万 token（成本和延迟都会被拖垮）。
+    # 只放前 CATALOG_MAX_TITLES 个标题，其余用"等共 N 份"概括。
     if catalog:
-        system += (
-            "\n\n本馆目前收录的资料有：" + "、".join(catalog) + "。"
-            "观众问「有什么文物」「有哪些资料」这类问题时，照这个清单回答；"
-            "但只能报出名字，不得根据名字编造年代、出土地、尺寸等任何细节。"
-        )
+        limit = max(config.CATALOG_MAX_TITLES, 0)
+        shown = catalog[:limit] if limit else []
+        if limit and len(catalog) > limit:
+            tail = f"……等共 {len(catalog)} 份资料"
+        else:
+            tail = ""
+        if shown:
+            system += (
+                "\n\n本馆目前收录的资料有：" + "、".join(shown) + tail + "。"
+                "观众问「有什么文物」「有哪些资料」这类问题时，照这个清单回答；"
+                "但只能报出名字，不得根据名字编造年代、出土地、尺寸等任何细节。"
+            )
 
     messages = [{"role": "system", "content": system}]
     # 窗口截取已由 memory 按"轮"对齐完成，这里不再二次截断：

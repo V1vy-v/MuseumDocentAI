@@ -107,7 +107,11 @@ TOP_K = 3
 # 索引目录见下方 VECTOR_DIR（要等 DATA_DIR 定义好）
 COLLECTION_NAME = "museum_kb"
 EMBED_DIM = _int_env("EMBED_DIM", 2048)          # 首次建库会用真实返回值校准
-EMBED_BATCH = _int_env("EMBED_BATCH", 10)        # 一次请求塞多少段，太大会顶到平台限制
+EMBED_BATCH = _int_env("EMBED_BATCH", 10)        # 一次请求塞多少段（平台硬上限就是 10）
+# 平台有频率限制：大批量建库时按 0.4s/批会被 429 打断，批间留一点间隔最省事。
+# 只影响首次建库/大幅增量，日常问答不受影响。
+EMBED_DELAY_SECONDS = _float_env("EMBED_DELAY_SECONDS", 0.35)
+EMBED_RETRIES = _int_env("EMBED_RETRIES", 6)     # 429/5xx 时的最大重试次数（指数退避）
 
 # 分块：300 字目标、400 字上限、50 字重叠。
 # 重叠是为了"答案正好卡在切点上"这种情况，代价只是索引略大。
@@ -140,6 +144,11 @@ DENSE_ENTITY_BOOST = _int_env("DENSE_ENTITY_BOOST", 1) == 1
 
 # 资料原文的浏览地址（debug 界面把命中来源做成可点的小气泡）
 KB_URL_PREFIX = "/api/kb/"
+
+# 注入提示词的"资料清单"标题上限。
+# 接入全国资料馆后资料有 4000+ 份，整份清单会让每次请求多出三四万 token；
+# 只列前 N 个，其余用"等共 N 份资料"概括。设为 0 表示完全不注入清单。
+CATALOG_MAX_TITLES = _int_env("CATALOG_MAX_TITLES", 120)
 
 # —— 会话持久化与上下文窗口（角色 D 用）——
 # 数据库落在 backend/data/chat.db，已在根 .gitignore 中排除，不会进仓库。

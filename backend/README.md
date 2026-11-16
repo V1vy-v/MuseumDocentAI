@@ -59,18 +59,22 @@ uvicorn app.main:app --reload --port 8000
 
 | 位置 | 谁负责 | 放什么 |
 |---|---|---|
-| `app/main.py` | D | 服务入口；启动时建表并清理过期会话（lifespan） |
-| `app/api/` | D | 对外接口：`chat.py` 文本问答、`voice.py` 语音问答、`sessions.py` 会话管理 |
-| `app/services/llm_client.py` | D | 封装 mimo-v2.5-asr 的调用（语音输入→回答） |
-| `app/services/tts_client.py` | D | 语音合成（mimo 无语音输出时启用） |
-| `app/services/rag.py` | C | 检索增强：查询改写、检索资料、防幻觉、给出来源 |
+| `app/main.py` | D | 服务入口；启动时建表、清理过期会话、建/更新向量索引（lifespan） |
+| `app/api/` | D | 对外接口：`chat.py` 文本问答、`voice.py` 语音问答、`sessions.py` 会话管理、`kb.py` 资料原文浏览 |
+| `app/services/llm_client.py` | D | 封装 DeepSeek 的调用（文本问答 / 流式 / 摘要 / 语音识别） |
+| `app/services/tts_client.py` | D | 语音合成（当前无可用服务，未配置时只返回文字） |
+| `app/services/rag.py` | C | 检索门面：选路、融合、防幻觉、给出来源与原文链接 |
+| `app/services/vector_store.py` | C | zvec 向量库：建库、增量同步、向量距离闸门 + BM25 混合检索 |
+| `app/services/chunker.py` | C | 把资料按 Markdown 结构切成检索单元 |
+| `app/services/embeddings.py` | C | 文本向量化（火山 Ark doubao-embedding-vision） |
+| `app/services/guard.py` | D | 本馆信息类问题识别：没资料时直接回固定话术，不给模型编造的机会 |
 | `app/services/store.py` | D | 对话持久化仓储层（SQLite）：建表、读写、TTL 清理 |
 | `app/services/memory.py` | D | 多轮对话记忆：历史保存、上下文窗口、最近摘要 |
 | `app/services/coreference.py` | D | 指代消解：把「它」「这个」补成完整问句（先消解再检索） |
-| `app/core/config.py` | D | 配置：模型名、API 密钥、数据库路径（**不要把密钥提交到仓库**） |
+| `app/core/config.py` | D | 配置：模型名、API 密钥、检索阈值、数据库路径（**不要把密钥提交到仓库**） |
 | `app/schemas/chat.py` | D | 请求/响应格式约定（**前端接口契约，不要改现有字段**） |
 | `app/schemas/session.py` | D | 会话管理接口的数据格式 |
-| `knowledge_base/` | C | 博物馆资料（文物介绍、历史背景、展厅路线、书画知识）+ 向量库 |
+| `knowledge_base/` | C | 博物馆资料（文物介绍、历史背景、展厅路线、书画知识），启动时自动建向量索引 |
 | `static/debug.html` | D | 调试台页面（纯静态单文件，挂在 `/debug`） |
 | `tests/` | D | 单元测试（标准库 unittest，零依赖） |
 | `docs/` | D | 后端文档：`后端PRD.md`（需求文档，课程用）、`接口文档.md`、`记忆系统与指代消解方案.md`；跨前后端的全局文档放仓库根的 `docs/` |
@@ -83,7 +87,8 @@ uvicorn app.main:app --reload --port 8000
 | `POST /api/chat` | 文本问答 `{question, session_id}` → `{answer, sources}` | 已在用 |
 | `POST /api/chat/stream` | **流式问答（SSE）**：`meta` → `delta`* → `done`/`error` | **可选**（接了才有打字机效果） |
 | `POST /api/voice` | 语音问答（multipart：`audio` + `session_id`）→ `{question, answer, sources, audio_base64}` | 已在用 |
-| `GET /api/health` | 健康检查 | 联调用 |
+| `GET /api/health` | 健康检查（附带向量索引状态：就绪 / 关键词降级） | 联调用 |
+| `GET /api/kb/{路径}` | 资料原文（`sources` 对应的 Markdown 渲染页，只读） | 不用调（调试台点来源气泡时用） |
 | `POST /api/sessions` | 新建会话 → `{session_id, created_at, existed}` | **可选** |
 | `GET /api/sessions` | 历史会话列表 → `{sessions: [...], count}` | **可选** |
 | `GET /api/sessions/{id}/messages` | 拉取历史 → `{session_id, title, summary, messages[]}` | **可选** |
@@ -117,7 +122,7 @@ cd backend
 .venv\Scripts\python.exe scripts\smoke_test.py
 ```
 
-它会依次验证：服务存活 → 完整问句问答 → **同会话用「它」追问仍能检索到资料** → 语音闭环。
+它会依次验证：服务存活 → 完整问句问答 → **同会话用「它」追问仍能检索到资料** → 语音接口。
 第 3 步是指代消解的回归项。
 
 ## 上下文与指代消解的行为说明

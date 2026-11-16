@@ -96,7 +96,7 @@ class ChatFlowTest(FlowTestCase):
         """模型看的是观众原话；history 里不能夹带 sources / tokens 等额外字段"""
         captured = {}
 
-        def fake_reply(question, history, sources, summary=""):
+        def fake_reply(question, history, sources, summary="", catalog=None):
             captured.update(question=question, history=history,
                             sources=sources, summary=summary)
             return "春秋晚期。", USAGE
@@ -167,7 +167,7 @@ class CompactionWiringTest(FlowTestCase):
     def test_summary_is_passed_to_model(self):
         captured = {}
 
-        def fake_reply(question, history, sources, summary=""):
+        def fake_reply(question, history, sources, summary="", catalog=None):
             captured["summary"] = summary
             return "回答", USAGE
 

@@ -28,9 +28,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .api import chat, sessions, voice
+from .api import chat, kb, sessions, voice
 from .core import config
-from .services import store
+from .services import store, vector_store
 
 DEBUG_PAGE = Path(__file__).resolve().parents[1] / "static" / "debug.html"
 
@@ -45,6 +45,12 @@ async def lifespan(app: FastAPI):
     removed = store.purge_expired()
     if removed:
         print(f"[启动] 已清理 {removed} 个超过 {config.SESSION_TTL_DAYS} 天未活动的会话")
+
+    # 建/更新向量索引。失败只是降级成关键词检索，不能让服务起不来。
+    # 注意：zvec 是进程内数据库，同一个索引目录只能被一个进程打开，
+    # 所以必须以单 worker 运行（uvicorn 默认就是 1，别加 --workers）。
+    vector_store.ensure_ready()
+
     print("[启动] 接口文档 http://127.0.0.1:{}/docs   调试台 http://127.0.0.1:{}/debug"
           .format(config.PORT, config.PORT))
     yield
@@ -76,11 +82,13 @@ async def flatten_http_error(request: Request, exc: StarletteHTTPException):
 app.include_router(chat.router)
 app.include_router(voice.router)
 app.include_router(sessions.router)
+app.include_router(kb.router)
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    """健康检查。顺带回报向量索引状态，方便启动后确认检索是"向量模式"还是"关键词降级"。"""
+    return {"status": "ok", "index": vector_store.stats()}
 
 
 @app.get("/debug", include_in_schema=False)

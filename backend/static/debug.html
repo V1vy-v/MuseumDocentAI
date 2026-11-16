@@ -96,6 +96,15 @@
   .msg.bot .bubble { background: var(--bot); }
   .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .meta code { background: var(--debug); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }
+  /* 命中索引时附在回答下面的来源气泡：灰色小胶囊，点开看资料原文 */
+  .src-pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .src-pill {
+    font-size: 11px; line-height: 1.5; color: var(--muted); background: var(--debug);
+    border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px;
+    text-decoration: none; white-space: nowrap;
+  }
+  a.src-pill:hover { border-color: #b9b1a6; color: #6b635a; }
+  .src-pill .sec { opacity: .65; margin-left: 4px; }
   .resolved { color: var(--ok); }
   .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
   #summary { white-space: pre-wrap; font-size: 13px; }
@@ -505,8 +514,11 @@ async function streamAnswer(question, bubbleWrap) {
         counts[name] = (counts[name] || 0) + 1;
         if (name === "meta") {
           info.resolved = data.resolved || "";
-          // 来源在模型开始生成之前就拿到了，可以先显示出来
-          if (data.sources && data.sources.length) {
+          // 来源在模型开始生成之前就拿到了，可以先显示出来。
+          // sources_detail 带原文链接（流式接口独有），没有它就退回纯文本来源。
+          if (data.sources_detail && data.sources_detail.length) {
+            setSourcePills(bubbleWrap.querySelector(".bubble"), data.sources_detail);
+          } else if (data.sources && data.sources.length) {
             setSources(bubbleWrap.querySelector(".bubble"), data.sources);
           }
         } else if (name === "delta") {
@@ -569,6 +581,24 @@ function setSources(bubble, sources) {
     bubble.appendChild(meta);
   }
   meta.innerHTML = "来源：" + sources.map(s => "<code>" + escapeHtml(s) + "</code>").join(" ");
+}
+
+// 命中的馆内资料 → 灰色小气泡，点开是资料原文（/api/kb/... 是后端提供的只读页面）
+function setSourcePills(bubble, detail) {
+  let box = bubble.querySelector(".src-pills");
+  if (!box) {
+    box = document.createElement("div");
+    box.className = "src-pills";
+    bubble.appendChild(box);
+  }
+  box.innerHTML = detail.map(s => {
+    const title = escapeHtml(s.title || "");
+    const sec = s.heading ? '<span class="sec">' + escapeHtml(s.heading) + "</span>" : "";
+    const tip = "参考资料" + (s.heading ? " · " + s.heading : "");
+    if (!s.url) return '<span class="src-pill" title="' + escapeHtml(tip) + '">' + title + sec + "</span>";
+    return '<a class="src-pill" href="' + escapeHtml(s.url) + '" target="_blank" rel="noopener"'
+         + ' title="' + escapeHtml(tip) + '，点击查看原文">' + title + sec + "</a>";
+  }).join("");
 }
 
 function appendText(wrap, piece) {

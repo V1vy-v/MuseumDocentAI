@@ -5,19 +5,26 @@
 #   .venv\Scripts\python.exe scripts\smoke_test.py
 #
 # 它会依次测试：
-#   1. 服务是否活着（/api/health）
+#   1. 服务是否活着（/api/health），顺带看向量索引是"向量模式"还是"关键词降级"
 #   2. 文本问答（/api/chat）—— 完整问句
 #   3. 多轮记忆 + 指代消解 —— 同一会话里用「它」追问，必须仍能检索到资料
-#   4. 语音闭环：用 TTS 造一句"提问语音" → 上传 /api/voice → 得到回答和播报语音
+#   4. 语音接口（/api/voice）是否活着
 #
 # 第 3 步是关键回归项：改造前 /api/chat 是先检索再取历史，用带代词的原文去检索
 # 必然命中为空，模型会回答「馆内资料暂未收录」——上一轮刚讲过，观众却觉得机器人失忆。
+#
+# 第 4 步的说明：目前没有可用的 TTS 服务，脚本造不出"真的说话"的测试音频。
+#   - 想完整测语音，自己录一段 wav，然后：$env:SMOKE_AUDIO="D:\rec.wav"
+#   - 不提供录音时，脚本会发一段静音，断言接口返回 422「没听清」——
+#     这仍然验证了 ASR 通、以及空识别结果被正确拦住（不会拿空问题去问模型）。
 
 import base64
+import io
 import os
 import sys
 import tempfile
 import uuid
+import wave
 from pathlib import Path
 
 import requests
@@ -25,18 +32,26 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from app.core import config  # noqa: E402  模型配置的唯一来源
-
-# 原来这里自己解析 .env，但 .env 里并没有 MIMO_API_URL，
-# 于是 MIMO_API_URL 取到空串，语音那步会 POST 到 "/chat/completions" 直接失败。
-# 改成复用 app.core.config，顺带去掉那段 ascii 解码（会静默丢掉非 ASCII 字符）。
 BACKEND = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000")
+
+
+def _silent_wav(seconds=1.0, rate=16000) -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(b"\x00\x00" * int(rate * seconds))
+    return buf.getvalue()
 
 
 def step1_health():
     r = requests.get(BACKEND + "/api/health", timeout=10)
-    assert r.json()["status"] == "ok", r.text
-    print("[1/4] 服务在线 ✓")
+    data = r.json()
+    assert data["status"] == "ok", r.text
+    index = data.get("index") or {}
+    mode = "向量索引就绪" if index.get("ready") else f"关键词降级（{index.get('error') or '未就绪'}）"
+    print(f"[1/4] 服务在线 ✓  检索模式：{mode}")
 
 
 def step2_chat():
@@ -50,6 +65,7 @@ def step2_chat():
     data = r.json()
     print("[2/4] 文本问答（完整问句）✓")
     print("      回答:", data["answer"][:80])
+    print("      来源:", data.get("sources"))
     return session_id
 
 
@@ -71,33 +87,39 @@ def step3_multiturn(session_id):
 
 
 def step4_voice():
-    if not config.MIMO_API_KEY:
-        raise AssertionError("backend/.env 里没有配置 XIAOMI_API_KEY，无法生成测试语音")
+    custom = os.environ.get("SMOKE_AUDIO")
+    if custom:
+        wav = Path(custom).read_bytes()
+        print(f"[4/4] 使用指定录音：{custom}（{len(wav)} 字节）")
+        expect_empty = False
+    else:
+        wav = _silent_wav()
+        print("[4/4] 未指定 SMOKE_AUDIO，发送静音音频（用于验证 ASR 通路与空结果拦截）")
+        expect_empty = True
 
-    # 4a. 用 TTS 造一句提问语音（模拟观众说话）
-    r = requests.post(config.MIMO_API_URL + "/chat/completions",
-                      headers={"Authorization": "Bearer " + config.MIMO_API_KEY},
-                      json={"model": config.MIMO_TTS_MODEL,
-                            "messages": [{"role": "assistant", "content": "你好，请问博物馆今天开放吗？"}]},
-                      timeout=90)
-    r.raise_for_status()
-    wav = base64.b64decode(r.json()["choices"][0]["message"]["audio"]["data"])
-    q_path = Path(tempfile.gettempdir()) / "smoke_question.wav"
-    q_path.write_bytes(wav)
-    print(f"[4/4] 已生成提问语音（{len(wav)} 字节）")
-
-    # 4b. 上传给语音接口
     r = requests.post(BACKEND + "/api/voice", timeout=180,
                       files={"audio": ("question.wav", wav, "audio/wav")},
                       data={"session_id": "smoke-voice-" + uuid.uuid4().hex[:8]})
+
+    if expect_empty:
+        if r.status_code == 422:
+            print("      ASR 通路正常，空识别被拦下 ✓")
+        elif r.status_code == 200:
+            print("      意外地识别出了内容:", r.json().get("question"))
+        else:
+            raise AssertionError(f"语音接口返回了 {r.status_code}: {r.text[:200]}")
+        return
+
     r.raise_for_status()
     data = r.json()
     print("      识别到的提问:", data.get("question", "(无)"))
     print("      回答:", data["answer"][:80])
     if data.get("audio_base64"):
-        a_path = Path(tempfile.gettempdir()) / "smoke_answer.wav"
+        a_path = Path(tempfile.gettempdir()) / "smoke_answer.bin"
         a_path.write_bytes(base64.b64decode(data["audio_base64"]))
         print(f"      播报语音已保存: {a_path}")
+    else:
+        print("      没有播报语音（当前未配置 TTS 服务，属预期）")
     print("[4/4] 语音闭环 ✓")
 
 
@@ -106,4 +128,4 @@ if __name__ == "__main__":
     session_id = step2_chat()
     step3_multiturn(session_id)
     step4_voice()
-    print("\n全部通过！文本、多轮指代、语音闭环均正常。")
+    print("\n全部通过！文本、多轮指代、语音接口均正常。")

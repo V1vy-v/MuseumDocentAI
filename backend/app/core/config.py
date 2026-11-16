@@ -25,6 +25,14 @@ def _load_env():
 _load_env()
 
 
+def _float_env(name: str, default: float) -> float:
+    """读一个浮点配置（阈值这类参数要能调，不该硬编码在代码里）"""
+    try:
+        return float(os.environ[name])
+    except (KeyError, ValueError):
+        return default
+
+
 def _int_env(name: str, default: int) -> int:
     """读一个整数配置，允许用环境变量覆盖（调参和调试用）。
 
@@ -38,24 +46,95 @@ def _int_env(name: str, default: int) -> int:
     except (KeyError, ValueError):
         return default
 
-# —— 大脑模型：mimo 系列（同一平台，已实测可用）——
-# 实测结论：
-#   mimo-v2.5-asr   语音输入（听懂提问，返回文字）
-#   mimo-v2.5-tts   语音输出（把回答变成语音，返回 base64 音频）
-#   mimo-v2.6-flash 文本回答（快速；复杂问题可换 mimo-v2.5-pro）
-MIMO_API_URL = os.environ.get("MIMO_API_URL", "https://token-plan-cn.xiaomimimo.com/v1")
-MIMO_API_KEY = os.environ.get("XIAOMI_API_KEY", "")
-MIMO_ASR_MODEL = os.environ.get("MIMO_ASR_MODEL", "mimo-v2.5-asr")
-MIMO_TEXT_MODEL = os.environ.get("MIMO_TEXT_MODEL", "mimo-v2.6-flash")
-MIMO_TTS_MODEL = os.environ.get("MIMO_TTS_MODEL", "mimo-v2.5-tts")
+# —— 模型分工（全部走云端 OpenAI 兼容接口，无本地模型依赖）——
+#   文本问答 / 摘要 / 指代消解后的回答 → DeepSeek deepseek-flash
+#   语音识别                        → DeepSeek /v1/tools/asr
+#   文档向量化                      → 火山 Ark doubao-embedding-vision
+#   语音合成                        → 暂缺（见 TTS_* 配置与 tts_client 的降级说明）
+
+# —— 文本大脑：DeepSeek（首选）——
+# 实测（本机）：GET /models 给出 deepseek-flash / deepseek-v4-pro；
+# deepseek-flash 默认会烧思考 token（completion 182 里 139 是思考），
+# 加 thinking.type=disabled 后 reasoning 归零、耗时 1.81s → 1.20s。
+# 注意 enable_thinking=false 对它【无效】，别用那个写法。
+DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_TEXT_MODEL = os.environ.get("DEEPSEEK_TEXT_MODEL", "deepseek-flash")
+DEEPSEEK_DISABLE_THINKING = _int_env("DEEPSEEK_DISABLE_THINKING", 1) == 1
+
+# 语音识别：DeepSeek 的工具接口（multipart 上传 file，返回 {"text": ...}）
+# 实测响应：{"request_id": "...", "text": "...", "duration_ms": 1000}
+DEEPSEEK_ASR_URL = os.environ.get("DEEPSEEK_ASR_URL",
+                                  "https://api.deepseek.com/v1/tools/asr")
+
+# —— 语音合成（可选，当前默认关闭）——
+# 目前手上没有可用的 TTS 服务：火山 Ark 的 /audio/speech 和 /tts 实测都是 404。
+# 这里留一个 OpenAI 兼容 /audio/speech 的通用配置：填了就自动启用；
+# 不填则 /api/voice 只返回文字、audio_base64 留空 —— 不报错、也不丢答案。
+TTS_API_URL = os.environ.get("TTS_API_URL", "")
+TTS_API_KEY = os.environ.get("TTS_API_KEY", "")
+TTS_MODEL = os.environ.get("TTS_MODEL", "")
+TTS_VOICE = os.environ.get("TTS_VOICE", "")
+
+# —— 文本大脑 + 向量：火山 Ark ——
+# 实测（本机，2026）：
+#   doubao-seed-2.1-lite    文本回答，OpenAI 兼容 /chat/completions，支持 stream
+#   doubao-embedding-vision 向量，POST /embeddings，实测 2048 维
+# 两者共用一个 API Key，但走同一个 base url。
+ARK_BASE_URL = os.environ.get("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/plan/v3")
+ARK_API_KEY = os.environ.get("ARK_API_KEY", "")
+ARK_TEXT_MODEL = os.environ.get("ARK_TEXT_MODEL", "doubao-seed-2.1-lite")
+ARK_EMBED_MODEL = os.environ.get("ARK_EMBED_MODEL", "doubao-embedding-vision")
+
+# doubao 默认会烧思考 token（实测一个寒暄烧了 469 个 reasoning token，
+# completion 里 89% 是思考）。讲解场景延迟敏感，默认关掉；
+# 万一平台不认这个参数，把开关置 0 即可，不影响其他调用。
+ARK_DISABLE_THINKING = _int_env("ARK_DISABLE_THINKING", 1) == 1
 
 # —— 服务设置 ——
 HOST = "0.0.0.0"
 PORT = 8000
 
-# —— RAG 设置（角色 C 用）——
+# —— RAG / 向量库（zvec，进程内，无需服务端）——
 KNOWLEDGE_BASE_DIR = BASE_DIR / "knowledge_base"
 TOP_K = 3
+
+# 索引目录见下方 VECTOR_DIR（要等 DATA_DIR 定义好）
+COLLECTION_NAME = "museum_kb"
+EMBED_DIM = _int_env("EMBED_DIM", 2048)          # 首次建库会用真实返回值校准
+EMBED_BATCH = _int_env("EMBED_BATCH", 10)        # 一次请求塞多少段，太大会顶到平台限制
+
+# 分块：300 字目标、400 字上限、50 字重叠。
+# 重叠是为了"答案正好卡在切点上"这种情况，代价只是索引略大。
+CHUNK_SIZE = _int_env("CHUNK_SIZE", 300)
+CHUNK_MAX = _int_env("CHUNK_MAX", 400)
+CHUNK_OVERLAP = _int_env("CHUNK_OVERLAP", 50)
+
+# 检索：稠密取 50 个候选（小库下等于全扫，保证融合时每段都有距离可用）、
+# FTS 取 20 个候选，再用 RRF 融合排序。
+DENSE_CANDIDATES = _int_env("DENSE_CANDIDATES", 50)
+FTS_CANDIDATES = _int_env("FTS_CANDIDATES", 20)
+RRF_RANK_CONSTANT = _int_env("RRF_RANK_CONSTANT", 60)
+
+# 相关性命中闸门：zvec 的 COSINE 返回的是【距离，越小越相似】。
+# 超过这个距离视为不相关 —— 这是治"博物馆开放时间命中越王勾践剑"这类
+# 假阳性的关键：光靠关键词，只要文档里出现"博物馆"三个字就会命中。
+#
+# 0.62 是实测标定的（doubao-embedding-vision，单文档库）：
+#   正例「越王勾践剑是什么时期」0.286、「剑身上有什么铭文」0.561
+#   负例「博物馆开放时间」0.762、「介绍一下你们馆」0.819、「有哪些展厅」0.731
+# 注意：距离阈值单独用会误杀——观众明确点名了某件文物时要无条件放行，
+# 见 DENSE_ENTITY_BOOST。
+DENSE_MAX_DISTANCE = _float_env("DENSE_MAX_DISTANCE", 0.62)
+
+# 问题里明确点名了知识库里的某件文物（如"越王勾践剑在哪个展厅"）时，
+# 该文物的资料直接视为相关，不再看距离。理由很朴素：
+# 观众点名问的东西，馆里有它的资料，那就一定该拿出来——
+# 这时候纠结语义距离只会把正确答案挡在门外。
+DENSE_ENTITY_BOOST = _int_env("DENSE_ENTITY_BOOST", 1) == 1
+
+# 资料原文的浏览地址（debug 界面把命中来源做成可点的小气泡）
+KB_URL_PREFIX = "/api/kb/"
 
 # —— 会话持久化与上下文窗口（角色 D 用）——
 # 数据库落在 backend/data/chat.db，已在根 .gitignore 中排除，不会进仓库。
@@ -63,22 +142,31 @@ TOP_K = 3
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = Path(os.environ.get("CHAT_DB_PATH", DATA_DIR / "chat.db"))
 
+# zvec 索引目录：落在 backend/data 下（已被根 .gitignore 排除），可随时删掉重建。
+# 注意 zvec 是【进程内】数据库，同一个目录只能被一个进程打开——
+# 所以这个后端必须以单 worker 运行（uvicorn --workers 1，默认就是 1）。
+VECTOR_DIR = Path(os.environ.get("VECTOR_DIR", DATA_DIR / "zvec_kb"))
+
+# 总开关：置 0 则完全不建索引、不调 embedding 接口（单元测试和离线环境用）。
+# 关掉后检索自动退回关键词模式，服务照常可用。
+RAG_VECTOR_ENABLED = _int_env("RAG_VECTOR_ENABLED", 1) == 1
+
 # —— 上下文窗口与长对话摘要（按 token 预算，而不是消息条数）——
 # 为什么用 token 而不是条数：一条 500 字的资料和一句"嗯"都算一条消息，
 # 按条数切窗口完全不准；token 才是真正的资源约束。
 #
-# 为什么窗口可以开这么大（2026-10 实测，不是估计）：
-#   - mimo-v2.6-flash 上下文窗口是 1M，输入价 $0.14 / 1M token
-#     → 12000 token 的提示词约 $0.0017/次，可忽略；
+# 为什么窗口可以开这么大（历史实测数据，量级结论仍然成立）：
+#   - 所用模型的上下文窗口在百万 token 量级，输入价格也很低
+#     → 12000 token 的提示词成本可忽略；
 #   - 提示词从 162 token 拉到 23598 token，耗时没有单调变差
 #     （延迟主要由输出/思考 token 和平台波动决定，实测波动 1.5s~16.6s）；
 #   - 前缀缓存生效：实测 cached_tokens 接近全量，重复前缀基本不重复计费。
 # 所以窗口大小的依据不是"装不下"，而是"要不要留这么多原文"。
 #
 # 不需要分词器：
-#   1. mimo 接口在 usage 里返回真实用量，安全阀直接用服务端数字；
+#   1. 各平台都在 usage 里返回真实用量，安全阀直接用服务端数字；
 #   2. 中文经验值 1 个汉字 ≈ 1 个 token（实测 13 字 → 15 prompt_token，含模板开销）。
-#   tiktoken 是 OpenAI 的词表，对 mimo 本来就不准，还要加依赖，不用。
+#   tiktoken 是 OpenAI 的词表，对这些模型本来就不准，还要加依赖，不用。
 #
 # 注意"窗口"和"触发阈值"是两件事：
 #   窗口 = 保留多少原文；阈值 = 滑出窗口的部分攒到多少才压缩。

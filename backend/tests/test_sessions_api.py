@@ -232,9 +232,14 @@ class LifespanStartupTest(unittest.TestCase):
         config.DATA_DIR = Path(self._tmp.name)
         config.DB_PATH = Path(self._tmp.name) / "fresh.db"   # 模拟全新部署：库还不存在
         store._schema_ready = False
+        # 这里测的是"建表 + 清理过期会话"，不关向量索引的话 lifespan 会真的
+        # 去调 embedding 接口建库 —— 单元测试不该依赖网络。
+        self._orig_rag = config.RAG_VECTOR_ENABLED
+        config.RAG_VECTOR_ENABLED = False
 
     def tearDown(self):
         config.DB_PATH, config.DATA_DIR = self._orig_db, self._orig_data
+        config.RAG_VECTOR_ENABLED = self._orig_rag
         store._schema_ready = False
         self._tmp.cleanup()
 

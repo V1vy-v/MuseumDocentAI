@@ -8,7 +8,7 @@
 #   1. 从 memory 取上下文（摘要 + 最近若干轮 + 上一轮引用的资料）
 #   2. coreference 做指代消解："它是什么年代的" → "越王勾践剑是什么年代的"
 #   3. rag 用【消解后的问句】检索——用原句检索只会切出一堆虚词片，必然搜不到
-#   4. 资料 + 摘要 + 历史 + 问题 → mimo 生成回答
+#   4. 资料 + 摘要 + 历史 + 问题 → DeepSeek 生成回答
 #   5. 双方都记入对话历史（用户消息同时记录原文和消解结果），并记下真实 token 用量
 #
 # 为什么流式做成【新增接口】而不是改 /api/chat：
@@ -50,7 +50,7 @@ def _prepare(req: ChatRequest) -> tuple:
     if not sources and query != req.question:
         sources = rag.retrieve(req.question)
 
-    return ctx, resolved, sources, [s["title"] for s in sources]
+    return ctx, resolved, sources, [s["title"] for s in sources], rag.catalog()
 
 
 def _save(session_id: str, question: str, answer: str, resolved: str, titles: list):
@@ -67,12 +67,12 @@ def _save(session_id: str, question: str, answer: str, resolved: str, titles: li
 
 @router.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
-    ctx, resolved, sources, titles = _prepare(req)
+    ctx, resolved, sources, titles, catalog = _prepare(req)
 
     # 4. 生成回答（模型看到的是观众原话，不是消解后的改写）
     try:
         answer, usage = llm_client.chat_reply(
-            req.question, ctx["history"], sources, ctx["summary"]
+            req.question, ctx["history"], sources, ctx["summary"], catalog
         )
     except Exception as exc:  # 模型调用失败时给前端友好提示
         raise HTTPException(status_code=502, detail={"error": str(exc), "hint": "AI 服务暂时不可用，请稍后再试"})
@@ -108,12 +108,23 @@ def chat_stream_events(req: ChatRequest):
     resolved = req.question      # 必须在 try 之前初始化：finally 里要用
     titles = []
     try:
-        ctx, resolved, sources, titles = _prepare(req)
+        ctx, resolved, sources, titles, catalog = _prepare(req)
         yield _sse("meta", {"session_id": req.session_id,
-                            "sources": titles, "resolved": resolved})
+                            "sources": titles,
+                            # sources_detail 只在这个流式接口里给：带原文链接和小节，
+                            # debug 界面拿它渲染可点的来源气泡。
+                            # /api/chat 的响应形状不动（那是和安卓端的冻结契约）。
+                            "sources_detail": [
+                                {"title": s.get("title", ""),
+                                 "heading": s.get("heading", ""),
+                                 "url": s.get("url", ""),
+                                 "score": s.get("score", 0)}
+                                for s in sources
+                            ],
+                            "resolved": resolved})
 
         for kind, payload in llm_client.stream_reply(
-                req.question, ctx["history"], sources, ctx["summary"]):
+                req.question, ctx["history"], sources, ctx["summary"], catalog):
             if kind == "delta":
                 buf.append(payload)
                 yield _sse("delta", {"text": payload})

@@ -4,13 +4,14 @@ uvicorn
 requests
 python-multipart      # 语音接口上传录音文件用
 
-# —— RAG 相关（角色 C 需要时再装）——
-# faiss-cpu
-# sentence-transformers
-# chromadb
+# —— RAG / 向量库 ——
+# zvec 是进程内向量数据库（无服务端），win/cp312 的 whl 约 11 MB，只依赖 numpy
+zvec
 
 # —— 语音合成 ——
-# 不需要另装：语音输出用同平台的 mimo-v2.5-tts（已实测可用）
+# 目前没有可用的 TTS 服务（见 app/services/tts_client.py 的说明）。
+# 没有 TTS 时 /api/voice 只返回文字，audio_base64 留空，不影响问答。
+# 向量化也不需要本地模型：走火山 Ark 的 doubao-embedding-vision（见 core/config.py）
 
 # —— 测试 ——
 # 不需要另装：单元测试用标准库 unittest（见 tests/），零依赖即可运行

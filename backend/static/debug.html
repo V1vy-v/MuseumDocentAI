@@ -53,6 +53,9 @@
   }
   #session-list li:hover .del { display: block; }
   #session-list .del:hover { color: var(--warn); }
+  /* 两步确认的中间状态：按钮变红并显示「确认?」，一眼能看出再点一次就真删 */
+  #session-list .del.confirm { color: #b42318; font-size: 11px; display: block; }
+  button.confirm { background: #fdecea; border-color: #f5b5ae; color: #b42318; }
   button.wide { width: 100%; }
   .chk { display: inline-flex; align-items: center; gap: 5px; font-size: 13px;
          color: var(--muted); cursor: pointer; user-select: none; }
@@ -282,6 +285,36 @@ function showError(msg, payload) {
 
 function clearError() { $("error").style.display = "none"; }
 
+/* 两步确认：第一次点把这个按钮变成「确认?」，3 秒内再点一次才真的执行。
+ *
+ * 为什么不用 confirm()：
+ *   1. 同一个删除落库操作有两个入口（列表里的 ✕、以及「删除当前会话」），
+ *      各写一个 confirm 就会一次点击弹两个框，取消第二个就表现为"点了没反应"；
+ *   2. 更麻烦的是 Chrome 在连续弹窗后会静默屏蔽，此后 confirm() 直接返回
+ *      false —— 按钮就彻底失效了，而且没有任何报错提示，极难排查。
+ * 状态记在 dataset 上，避免闭包里拿到过期的定时器。 */
+function armConfirm(btn, action) {
+  if (!btn) return;
+  if (btn.dataset.armed === "1") {
+    btn.dataset.armed = "";
+    btn.classList.remove("confirm");
+    btn.textContent = btn.dataset.label || btn.textContent;
+    clearTimeout(Number(btn.dataset.timer) || 0);
+    action();
+    return;
+  }
+  btn.dataset.label = btn.dataset.label || btn.textContent;
+  btn.dataset.armed = "1";
+  btn.classList.add("confirm");
+  btn.textContent = "确认?";
+  const timer = setTimeout(() => {
+    btn.dataset.armed = "";
+    btn.classList.remove("confirm");
+    btn.textContent = btn.dataset.label;
+  }, 3000);
+  btn.dataset.timer = String(timer);
+}
+
 function setRaw(label, obj) {
   $("raw").textContent = "// " + label + "\n" + JSON.stringify(obj, null, 2);
 }
@@ -389,11 +422,10 @@ function renderSessionList() {
     del.className = "del";
     del.title = "删除这个会话";
     del.textContent = "✕";
+    // 两步确认（见 armConfirm 的说明），不用 confirm()
     del.onclick = (ev) => {
       ev.stopPropagation();
-      if (confirm("删除会话「" + (s.title || s.session_id) + "」？\n它的原文和摘要会一起删掉。")) {
-        deleteSessionById(s.session_id);
-      }
+      armConfirm(del, () => deleteSessionById(s.session_id));
     };
 
     li.appendChild(title);
@@ -414,9 +446,6 @@ async function switchSession(id) {
 
 async function deleteSessionById(id) {
   clearError();
-  // 删除是不可撤销的（消息随外键级联清掉），所以先确认一次。
-  // 这里存的是真实对话记录，误点一下代价太大。
-  if (!confirm("确定删除会话「" + id + "」及其全部消息吗？\n删除后无法恢复。")) return;
   const data = await api("/api/sessions/" + encodeURIComponent(id), { method: "DELETE" });
   setRaw("DELETE /api/sessions/" + id, data);
   showInfo("删除结果：deleted = " + data.deleted + (data.deleted ? "" : "（本来就不存在，删除是幂等的）"));
@@ -777,7 +806,8 @@ $("btn-new").onclick = () => newSession().catch(e => showError(e.message, e.payl
 $("btn-new-top").onclick = () => newSession().catch(e => showError(e.message, e.payload));
 $("btn-refresh-list").onclick = () => loadSessionList();
 $("btn-load").onclick = () => loadHistory(false).catch(e => showError(e.message, e.payload));
-$("btn-delete").onclick = () => deleteSession().catch(e => showError(e.message, e.payload));
+$("btn-delete").onclick = () => armConfirm($("btn-delete"),
+  () => deleteSession().catch(e => showError(e.message, e.payload)));
 $("btn-use").onclick = () => {
   const v = $("session-input").value.trim();
   setSession(v);

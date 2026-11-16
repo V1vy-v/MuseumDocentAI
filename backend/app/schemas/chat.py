@@ -5,6 +5,8 @@
 
 from pydantic import BaseModel
 
+from .session import SourceItem
+
 
 class ChatRequest(BaseModel):
     """文本问答请求"""
@@ -24,6 +26,9 @@ class VoiceResponse(BaseModel):
     answer: str                      # 回答文本（识别出的问题对应的回答）
     sources: list[str] = []          # 资料来源标题列表
     audio_base64: str = ""           # 回答的语音（base64 WAV），空串表示不播报
+    # 新增的可选字段（不影响老前端）：sources 的增强版，带原文链接和小节，
+    # 形状与 /api/chat/stream 的 meta.sources_detail 一致。
+    sources_detail: list[SourceItem] = []
 
 
 class ErrorResponse(BaseModel):

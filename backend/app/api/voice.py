@@ -72,5 +72,12 @@ async def voice(audio: UploadFile = File(...), session_id: str = Form(...)):
     memory.remember(session_id, "assistant", answer,
                     sources=[s["title"] for s in sources])
     memory.record_usage(session_id, usage)
-    return VoiceResponse(question=question, answer=answer,
-                         sources=[s["title"] for s in sources], audio_base64=audio_b64)
+    return VoiceResponse(
+        question=question, answer=answer,
+        sources=[s["title"] for s in sources],
+        audio_base64=audio_b64,
+        # 检索结果就地带过来，不用像历史接口那样再按标题反查
+        sources_detail=[{"title": s.get("title", ""), "heading": s.get("heading", ""),
+                         "url": s.get("url", ""), "score": s.get("score", 0)}
+                        for s in sources],
+    )

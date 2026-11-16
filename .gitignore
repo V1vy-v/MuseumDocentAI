@@ -21,7 +21,11 @@ __pycache__/
 venv/
 backend/.env
 
-# 会话数据库（本地数据，不入库）—— 首次生成 backend/data/chat.db 前必须生效
+# 会话数据库 + 向量索引（本地派生数据，不入库）
+# backend/data/ 下有两样东西：
+#   chat.db    —— 会话历史，丢了就是对话记录没了
+#   zvec_kb/   —— 向量索引，丢了没关系，下次启动会按 knowledge_base/ 自动重建
+# 所以整个 data/ 都不提交：别人拿到源码 + 资料，启动时自动建索引。
 backend/data/
 *.db
 *.db-wal
@@ -30,6 +34,10 @@ backend/data/
 # 测试缓存
 backend/.pytest_cache/
 
+# IDE
+/.idea/inspectionProfiles/
+/.vscode/
+
 # 本地临时工具（不提交）
 .tools/
 pypdf_lib/
@@ -37,6 +45,3 @@ pypdf_lib/
 
 # Python 后端的本地虚拟环境
 backend/.venv/
-
-# 向量库等大文件（角色C 构建后按需放开注释）
-# backend/knowledge_base/vector_db/

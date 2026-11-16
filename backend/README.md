@@ -6,9 +6,30 @@
 
 ```bash
 cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+pip install -r requirements.txt      # 含 zvec（向量库，win 包约 11MB）
+cp .env.example .env                 # 然后把两个密钥填进去
+uvicorn app.main:app --port 8000     # 开发时可以加 --reload
 ```
+
+`.env` 里的两个密钥分工不同：
+
+| 变量 | 用途 | 不填会怎样 |
+|---|---|---|
+| `DEEPSEEK_API_KEY` | 文本问答、摘要、语音识别 | 问答直接 502 |
+| `ARK_API_KEY` | 文档向量化（检索用） | 服务照常起，但检索退回关键词模式 |
+
+**向量索引会自动构建，不需要任何手工命令**：启动时按 `knowledge_base/` 的资料
+切块 + 向量化，写进 `backend/data/zvec_kb/`（已 gitignore，可随时删掉重建）。
+第一次约 1.5 秒，之后只重建改过的文件。日志会告诉你走的是哪条路：
+
+```
+[向量库] 就绪 dim=2048 文件=1 本次变更=1 新增块=1
+[启动] 文本模型 deepseek-flash @ https://api.deepseek.com
+```
+
+如果看到 `[向量库] 未配置 ARK_API_KEY → 检索退回关键词模式`，就是 key 没配好。
+
+> ⚠️ 只能单进程跑（别用 `--workers 2`）。向量库是进程内数据库，一个索引目录只能被一个进程打开。
 
 跑起来后浏览器打开：
 
@@ -52,6 +73,9 @@ uvicorn app.main:app --reload --port 8000
 | `SUMMARY_TRIGGER_TOKENS` | 1500 | 滑出窗口的部分累积超过此值才压缩一次 |
 | `SUMMARY_MAX_CHARS` | 400 | 摘要长度上限 |
 | `PROMPT_TOKEN_ALERT` | 200000 | 提示词超过此值就告警 |
+| `DENSE_MAX_DISTANCE` | 0.62 | **检索相关性闸门**（COSINE 距离，越小越像）。调大=召回更多但更容易混进不相关的，调小=更严格 |
+| `RAG_VECTOR_ENABLED` | 1 | 置 `0` 完全关闭向量检索（不建索引、不调 embedding），直接用关键词模式 |
+| `VECTOR_DIR` | `backend/data/zvec_kb` | 索引目录位置 |
 
 值写错（比如填了非数字）会退回默认值，不会把服务带崩。
 

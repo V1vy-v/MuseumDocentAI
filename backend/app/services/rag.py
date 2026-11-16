@@ -57,7 +57,9 @@ def _retrieve_keyword(question: str) -> list:
         hits = sum(1 for w in words if w in text or w in path.stem)
         if hits >= 2:
             rel = path.relative_to(kb_dir).as_posix()
-            results.append({"title": path.stem, "content": text[:500],
+            # 标题统一走 normalize_title：降级模式和向量模式必须给出同一个名字，
+            # 否则前端会一会儿看到"示例_越王勾践剑"、一会儿看到"越王勾践剑"。
+            results.append({"title": coreference.normalize_title(path.stem), "content": text[:500],
                             "heading": "", "path": rel, "url": _url(rel),
                             "score": float(hits), "_hits": hits})
 

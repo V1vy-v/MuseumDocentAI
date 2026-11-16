@@ -19,6 +19,7 @@ import hashlib
 import json
 import shutil
 import threading
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -173,6 +174,27 @@ def _build_docs(rel_path: str, chunks: list, vectors: list) -> list:
     return docs
 
 
+def _open_with_retry(dim: int, attempts: int = 3, delay: float = 0.8):
+    """打开/创建集合，遇到"别人还占着锁"就等一会儿重试。
+
+    为什么需要：`uvicorn --reload` 改代码会自动重启子进程，旧进程可能
+    还没来得及释放 LOCK，新进程就起来了。实测会报
+    "Can't lock read-write collection"。不重试的话，一次普通的代码修改
+    就会让检索掉回关键词模式，很误导人。
+    """
+    last = None
+    for attempt in range(attempts):
+        try:
+            return _open_or_create(dim)
+        except Exception as exc:        # noqa: BLE001
+            last = exc
+            if "lock" not in str(exc).lower() or attempt == attempts - 1:
+                raise
+            print(f"[向量库] 索引被占用，{delay}s 后重试（{attempt + 1}/{attempts}）")
+            time.sleep(delay)
+    raise last
+
+
 def _sync(col) -> dict:
     """把知识库同步进索引，只处理变过的文件"""
     files = _scan_files()
@@ -257,7 +279,7 @@ def ensure_ready(force: bool = False) -> bool:
                     return False
                 col = _col
             else:
-                col = _open_or_create(dim)
+                col = _open_with_retry(dim)
 
             _dim = dim
             _col = col

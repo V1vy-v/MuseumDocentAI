@@ -79,6 +79,15 @@ def _chat_raw(messages, model=None) -> dict:
                       target["url"], target["key"], target["extra"])
 
 
+def describe_provider() -> str:
+    """给启动日志用：说清当前文本模型到底是哪家，排查时不用靠猜"""
+    try:
+        target = _text_target()
+    except Exception as exc:            # noqa: BLE001
+        return f"未配置（{exc}）"
+    return f"{target['model']} @ {target['url']}"
+
+
 def _content(data: dict) -> str:
     return (data["choices"][0]["message"].get("content") or "").strip()
 

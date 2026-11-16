@@ -30,7 +30,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .api import chat, kb, sessions, voice
 from .core import config
-from .services import store, vector_store
+from .services import llm_client, store, vector_store
 
 DEBUG_PAGE = Path(__file__).resolve().parents[1] / "static" / "debug.html"
 
@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI):
     # 所以必须以单 worker 运行（uvicorn 默认就是 1，别加 --workers）。
     vector_store.ensure_ready()
 
+    print(f"[启动] 文本模型 {llm_client.describe_provider()}")
     print("[启动] 接口文档 http://127.0.0.1:{}/docs   调试台 http://127.0.0.1:{}/debug"
           .format(config.PORT, config.PORT))
     yield

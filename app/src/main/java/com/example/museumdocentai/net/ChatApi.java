@@ -29,7 +29,14 @@ public interface ChatApi {
      * - onFailure：拿到一句"可以直接显示给用户"的错误说明
      */
     interface Callback {
-        void onSuccess(String answer, List<String> sources, byte[] audio);
+        /**
+         * @param answer      回答文本
+         * @param sources     资料来源标题（可能为空）
+         * @param audio       回答音频（语音提问才有，文字提问为 null）
+         * @param recognized  语音提问时后端识别出的问句；文字提问为空串。
+         *                    界面用它把"🎤 语音提问"占位换成真正的问题内容。
+         */
+        void onSuccess(String answer, List<String> sources, byte[] audio, String recognized);
 
         void onFailure(String message);
     }

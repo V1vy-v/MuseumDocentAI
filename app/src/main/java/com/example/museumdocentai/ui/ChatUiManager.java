@@ -57,6 +57,9 @@ public class ChatUiManager {
     private final SwitchCompat switchVoice;
     private final Button btnSettings;
 
+    /** 语音提问的占位气泡：拿到后端识别文本后替换成真正的问题内容 */
+    private ChatMessage voiceBubble;
+
     /** 本地设置：记住"语音播报"开关的状态 */
     private static final String PREFS_NAME = "docent_prefs";
     private static final String KEY_VOICE_REPLY = "voice_reply";
@@ -203,7 +206,17 @@ public class ChatUiManager {
 
         ChatApi.Callback callback = new ChatApi.Callback() {
             @Override
-            public void onSuccess(String answer, List<String> sources, byte[] audio) {
+            public void onSuccess(String answer, List<String> sources, byte[] audio, String recognized) {
+                // 语音提问：把"🎤 语音提问"占位换成识别出的真实问题（修复"看不到自己说了什么"）
+                if (voiceBubble != null) {
+                    ChatMessage bubble = voiceBubble;
+                    voiceBubble = null;
+                    String spoken = recognized == null ? "" : recognized.trim();
+                    if (!spoken.isEmpty()) {
+                        bubble.setText("🎤 " + spoken);
+                        refreshMessage(bubble);
+                    }
+                }
                 // 把占位气泡替换成真实回答
                 pending.setText(answer);
                 pending.setSources(sources);
@@ -226,6 +239,7 @@ public class ChatUiManager {
 
             @Override
             public void onFailure(String message) {
+                voiceBubble = null;     // 失败时占位气泡保持原样，下次提问重新记录
                 // 出错：红色气泡 + Toast 提示
                 pending.setText(message);
                 pending.setStatus(ChatMessage.Status.ERROR);
@@ -279,10 +293,12 @@ public class ChatUiManager {
             isRecording = false;
             restoreMicButton();
             hideStatus();
-            // 用户的语音提问显示成一条消息，然后把录音交给后端
-            adapter.add(new ChatMessage(ChatMessage.Role.USER,
+            // 用户的语音提问先显示一条占位消息，识别结果回来后替换成真实问题
+            ChatMessage bubble = new ChatMessage(ChatMessage.Role.USER,
                     activity.getString(R.string.voice_message_label),
-                    null, ChatMessage.Status.DONE));
+                    null, ChatMessage.Status.DONE);
+            voiceBubble = bubble;
+            adapter.add(bubble);
             askBackend(null, wavFile);
         }
 

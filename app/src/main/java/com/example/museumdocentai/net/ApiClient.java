@@ -350,10 +350,15 @@ public class ApiClient implements ChatApi {
                 }
             }
 
+            // 语音提问时后端会带回识别出的问句，界面拿它替换"🎤 语音提问"占位
+            String recognized = withAudio ? json.optString("question", "") : "";
+
             final String finalAnswer = answer;
             final List<String> finalSources = sources;
             final byte[] finalAudio = audio;
-            mainHandler.post(() -> callback.onSuccess(finalAnswer, finalSources, finalAudio));
+            final String finalRecognized = recognized;
+            mainHandler.post(() -> callback.onSuccess(
+                    finalAnswer, finalSources, finalAudio, finalRecognized));
         } catch (JSONException e) {
             deliverFailure(callback, context.getString(R.string.err_server));
         }

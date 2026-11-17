@@ -59,8 +59,17 @@ if __name__ == "__main__":
         print("未配置 EMBED_API_KEY / ARK_API_KEY，无法向量化。请先在 backend/.env 里填好。")
         sys.exit(1)
 
+    # 坑：索引目录被删掉、但 manifest（记录"哪些文件已索引"）还在时，
+    # 增量同步会认为"全都建过了"，结果建出一个空索引（实测踩过）。
+    # 所以索引目录不存在就把 manifest 一并清掉，强制按资料目录重建。
+    manifest = INDEX_DIR.parent / (INDEX_DIR.name + ".manifest.json")
+    if not INDEX_DIR.exists() and manifest.exists():
+        print(f"[修正] 索引目录不存在但清单还在，已删除清单 {manifest.name}，将全量重建")
+        manifest.unlink()
+
     print(f"资料目录：{config.KNOWLEDGE_BASE_DIR}")
     print(f"索引目录：{INDEX_DIR}")
+    print(f"向量服务：{config.EMBED_MODEL} @ {config.EMBED_BASE_URL}")
     print(f"批间隔 {config.EMBED_DELAY_SECONDS}s / 批大小 {config.EMBED_BATCH} / "
           f"重试 {config.EMBED_RETRIES} 次")
 

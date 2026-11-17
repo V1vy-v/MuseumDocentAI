@@ -140,6 +140,14 @@ public interface ChatApi {
         /** 生成完成，answer 是完整回答 */
         void onDone(String answer);
 
+        /**
+         * 整条流结束（含音频全部推完）。
+         *
+         * 注意 done 事件在语音之前：文字一完整就发 done，语音还在后面继续推。
+         * 所以"补全剩余文字"这类收尾动作要放在这里，而不是 onDone。
+         */
+        void onStreamEnd();
+
         void onFailure(String message);
     }
 

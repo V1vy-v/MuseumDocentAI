@@ -295,8 +295,10 @@ public class ChatUiManager {
         final int mySeq = ++streamSeq;
         // 打开播报时才请求后端"边生成边合成"；关掉就只拿文字，省一次合成开销
         apiClient.streamText(question, sessionId, wantAudio, new ChatApi.StreamCallback() {
-            /** 本轮是否收到过后端推来的语音（有的话 onDone 里就不用再整段合成） */
+            /** 本轮是否收到过后端推来的语音（有的话收尾时就不用再整段合成） */
             private boolean gotAudio = false;
+            /** done 事件带回来的完整回答，收尾时用来补全文字 */
+            private String answerText = null;
 
             @Override
             public void onMeta(List<String> sources) {
@@ -347,22 +349,37 @@ public class ChatUiManager {
             public void onDone(String answer) {
                 String finalText = (answer == null || answer.isEmpty())
                         ? buffer.toString() : answer;
-                // 补上还没显示的部分：TTS 不可用、或超出合成上限时，文字不能漏
-                if (wantAudio && finalText.length() > shown.length()) {
-                    shown.setLength(0);
-                    shown.append(finalText);
+                answerText = finalText;
+                // done 在语音之前到达：开播报时这里先不把全文铺出来，
+                // 否则后面的语音逐句追加会把整段文字重复一遍。
+                // 收尾统一放到 onStreamEnd（音频推完）时做。
+                if (!wantAudio) {
                     pending.setText(finalText);
+                    pending.setStatus(ChatMessage.Status.DONE);
                     refreshMessage(pending);
-                } else if (!wantAudio) {
-                    pending.setText(finalText);
+                    scrollToBottom();
+                    hideStatus();
                 }
-                pending.setStatus(ChatMessage.Status.DONE);
-                refreshMessage(pending);
-                scrollToBottom();
+            }
+
+            @Override
+            public void onStreamEnd() {
+                if (mySeq != streamSeq) {
+                    return;
+                }
+                // 补全还没显示的部分：TTS 不可用、或超出合成上限时，文字不能漏
+                if (answerText != null && answerText.length() > shown.length()) {
+                    shown.setLength(0);
+                    shown.append(answerText);
+                    pending.setText(answerText);
+                    pending.setStatus(ChatMessage.Status.DONE);
+                    refreshMessage(pending);
+                    scrollToBottom();
+                }
                 hideStatus();
-                // 开关关掉就只显示文字；后端没推语音（比如 TTS 不可用）时退回整段合成
-                if (wantAudio && !gotAudio && !finalText.isEmpty()) {
-                    speak(finalText);
+                // 后端一句语音都没推（比如 TTS 不可用）时，退回整段合成
+                if (wantAudio && !gotAudio && answerText != null && !answerText.isEmpty()) {
+                    speak(answerText);
                 }
             }
 

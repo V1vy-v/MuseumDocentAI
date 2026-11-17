@@ -18,7 +18,9 @@ import requests
 
 from ..core import config
 
-_TIMEOUT = 60
+# 连不上要快速失败：一次抽风卡 60 秒，会让整条问答跟着卡住，
+# 不如早点抛错、让检索退回关键词模式（这里 10 秒足够往返一次）
+_TIMEOUT = getattr(config, "EMBED_TIMEOUT_SECONDS", 10)
 
 
 class EmbeddingError(RuntimeError):

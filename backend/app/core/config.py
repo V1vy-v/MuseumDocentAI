@@ -125,6 +125,9 @@ EMBED_BATCH = _int_env("EMBED_BATCH", 100)       # 一次请求塞多少段
 # 只影响首次建库/大幅增量，日常问答不受影响。
 EMBED_DELAY_SECONDS = _float_env("EMBED_DELAY_SECONDS", 0.35)
 EMBED_RETRIES = _int_env("EMBED_RETRIES", 6)     # 429/5xx 时的最大重试次数（指数退避）
+# 向量接口超时：连不上就快速失败、退回关键词检索。
+# 原来固定 60 秒，网络一抽风整条问答就卡一分钟（实测踩过）。
+EMBED_TIMEOUT_SECONDS = _float_env("EMBED_TIMEOUT_SECONDS", 10)
 
 # 分块：600 字目标、700 字上限、50 字重叠。
 # 块大一点的目的很实际：新建库要调 500+ 次 embedding（平台限速约 10 次/分钟），

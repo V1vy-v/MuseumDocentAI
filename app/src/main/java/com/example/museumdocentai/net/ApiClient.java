@@ -350,13 +350,19 @@ public class ApiClient implements ChatApi {
                 return;
             }
             IOException lastError = null;
+            streamed = 0;               // 新一轮，重新计数
             for (String base : baseUrlsToTry()) {
                 try {
-                    streamOnce(base, "/api/chat/stream", body.toString(), callback);
+                    int events = streamOnce(base, "/api/chat/stream", body.toString(), callback);
                     workingBaseUrl = base;
                     return;
                 } catch (IOException e) {
                     lastError = e;
+                    // 已经收到过事件就别换地址重放了：
+                    // 流结束时连接被重置很常见，重放会把整段回答（含语音）重复一遍
+                    if (streamed > 0) {
+                        return;
+                    }
                 }
             }
             String message = context.getString(R.string.err_network);
@@ -364,10 +370,14 @@ public class ApiClient implements ChatApi {
         });
     }
 
-    /** 读一整个 SSE 流：event: meta / delta / done / error */
-    private void streamOnce(String baseUrl, String path, String jsonBody, StreamCallback callback)
+    /** 本轮已经派发出去的事件数（用来判断"是不是真的一句都没收到"） */
+    private int streamed = 0;
+
+    /** 读一整个 SSE 流：event: meta / delta / done / error。返回派发的事件数。 */
+    private int streamOnce(String baseUrl, String path, String jsonBody, StreamCallback callback)
             throws IOException {
         HttpURLConnection connection = openConnection(baseUrl, path);
+        int count = 0;
         try {
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             connection.setRequestProperty("Accept", "text/event-stream");
@@ -389,12 +399,16 @@ public class ApiClient implements ChatApi {
                     event = line.substring(6).trim();
                 } else if (line.startsWith("data:")) {
                     dispatchSseEvent(event, line.substring(5).trim(), callback);
+                    count++;
+                    streamed = count;
                 }
             }
             reader.close();
+            mainHandler.post(callback::onStreamEnd);      // 流结束（音频也推完了）
         } finally {
             connection.disconnect();
         }
+        return count;
     }
 
     private void dispatchSseEvent(String event, String payload, StreamCallback callback) {

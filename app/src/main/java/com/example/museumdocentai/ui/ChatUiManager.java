@@ -14,7 +14,6 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -55,7 +54,8 @@ public class ChatUiManager {
     private final EditText editQuestion;
     private final Button btnSend;
     private final Button btnMic;
-    private final SwitchCompat switchVoice;
+    /** 输入区里的"语音播报"胶囊按钮（替代原来的 Switch） */
+    private final Button btnVoice;
     private final Button btnSettings;
     /** 空对话时的引导卡片（列几个"试试问我"） */
     private final View layoutEmpty;
@@ -105,19 +105,16 @@ public class ChatUiManager {
         player = new AudioPlayer(activity);
         recorder = new VoiceRecorder(activity, recorderListener);
 
-        // 顶部"语音播报"开关：默认打开，关掉后只显示文字不朗读
-        switchVoice = activity.findViewById(R.id.switch_voice);
-        btnSettings = activity.findViewById(R.id.btn_settings);
-        switchVoice.setChecked(isVoiceReplyEnabled());
-        switchVoice.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            setVoiceReplyEnabled(isChecked);
-            if (!isChecked && player.isPlaying()) {
-                player.stop();       // 关掉开关时立刻停止正在播放的语音
-            }
-        });
+        // 输入区里的"语音播报"胶囊：默认打开，关掉后只显示文字不朗读
+        btnVoice = activity.findViewById(R.id.btn_voice);
+        refreshVoicePill();
+        btnVoice.setOnClickListener(v -> toggleVoiceReply());
 
-        // 顶部"服务器"按钮：改后端地址（真机测试要填电脑的局域网 IP）
-        btnSettings.setOnClickListener(v -> showServerDialog());
+        // 抽屉底部的"服务器"按钮：改后端地址（真机测试要填电脑的局域网 IP）
+        btnSettings = activity.findViewById(R.id.btn_drawer_settings);
+        if (btnSettings != null) {
+            btnSettings.setOnClickListener(v -> showServerDialog());
+        }
 
         // 空态引导：没有消息时显示几个示例问题，点一下直接提问
         layoutEmpty = activity.findViewById(R.id.layout_empty);
@@ -148,6 +145,24 @@ public class ChatUiManager {
 
     // ================== 设置：语音播报开关 / 服务器地址 ==================
 
+    /** 切换语音播报（输入区的胶囊按钮） */
+    public void toggleVoiceReply() {
+        boolean next = !isVoiceReplyEnabled();
+        setVoiceReplyEnabled(next);
+        if (!next && player.isPlaying()) {
+            player.stop();          // 关掉开关时立刻停止正在播放的语音
+        }
+        refreshVoicePill();
+    }
+
+    /** 胶囊文案跟着开关状态变：🔊 / 🔇 */
+    private void refreshVoicePill() {
+        if (btnVoice != null) {
+            btnVoice.setText(isVoiceReplyEnabled()
+                    ? R.string.pill_voice_on : R.string.pill_voice_off);
+        }
+    }
+
     /** 语音播报是否打开（用户的选择会记住，下次启动沿用） */
     private boolean isVoiceReplyEnabled() {
         return prefs().getBoolean(KEY_VOICE_REPLY, true);
@@ -162,7 +177,7 @@ public class ChatUiManager {
     }
 
     /** 弹窗填写后端地址；留空表示自动（模拟器默认地址） */
-    private void showServerDialog() {
+    public void showServerDialog() {
         final EditText input = new EditText(activity);
         input.setHint(R.string.dialog_server_hint);
         input.setText(apiClient.getServerUrl());

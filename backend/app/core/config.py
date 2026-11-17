@@ -109,7 +109,7 @@ EMBED_MODEL = os.environ.get("EMBED_MODEL", "").strip() or ARK_EMBED_MODEL
 ARK_DISABLE_THINKING = _int_env("ARK_DISABLE_THINKING", 1) == 1
 
 # —— 服务设置 ——
-HOST = "0.0.0.0"
+# 监听地址由 uvicorn 命令行决定（--host/--port），这里只留端口用于启动日志打印。
 PORT = 8000
 
 # —— RAG / 向量库（zvec，进程内，无需服务端）——

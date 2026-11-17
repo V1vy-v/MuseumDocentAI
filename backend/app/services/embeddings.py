@@ -35,10 +35,6 @@ def _headers() -> dict:
             "Content-Type": "application/json"}
 
 
-def _provider() -> str:
-    return f"{config.EMBED_MODEL} @ {config.EMBED_BASE_URL}"
-
-
 def _embed_batch(texts: list) -> list:
     """一次 HTTP 请求做一批，返回与 texts 顺序一致的向量列表
 

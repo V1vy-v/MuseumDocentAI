@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.api.chat import chat, chat_stream_events   # noqa: E402
 from app.core import config                          # noqa: E402
 from app.schemas.chat import ChatRequest             # noqa: E402
-from app.services import llm_client, memory, rag, store  # noqa: E402
+from app.services import llm_client, rag, store   # noqa: E402
 
 
 class _FakeStream:

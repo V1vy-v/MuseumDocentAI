@@ -44,7 +44,8 @@ import java.util.List;
 public class ChatUiManager {
 
     private final Activity activity;
-    private final String sessionId;
+    /** 会话编号：切历史会话时会变，所以不能是 final */
+    private String sessionId;
 
     // 界面上的各个控件
     private final RecyclerView recyclerMessages;
@@ -56,6 +57,8 @@ public class ChatUiManager {
     private final Button btnMic;
     private final SwitchCompat switchVoice;
     private final Button btnSettings;
+    /** 空对话时的引导卡片（列几个"试试问我"） */
+    private final View layoutEmpty;
 
     /** 语音提问的占位气泡：拿到后端识别文本后替换成真正的问题内容 */
     private ChatMessage voiceBubble;
@@ -115,6 +118,32 @@ public class ChatUiManager {
 
         // 顶部"服务器"按钮：改后端地址（真机测试要填电脑的局域网 IP）
         btnSettings.setOnClickListener(v -> showServerDialog());
+
+        // 空态引导：没有消息时显示几个示例问题，点一下直接提问
+        layoutEmpty = activity.findViewById(R.id.layout_empty);
+        bindSuggestion(R.id.btn_suggest_1);
+        bindSuggestion(R.id.btn_suggest_2);
+        bindSuggestion(R.id.btn_suggest_3);
+        updateEmptyState();
+    }
+
+    /** 把"示例问题"按钮绑定成：填入输入框并直接发送 */
+    private void bindSuggestion(int viewId) {
+        View view = activity.findViewById(viewId);
+        if (view != null) {
+            view.setOnClickListener(v -> {
+                String text = ((Button) view).getText().toString();
+                editQuestion.setText(text);
+                onSendClicked();
+            });
+        }
+    }
+
+    /** 消息列表空/非空时切换引导卡片的显示 */
+    private void updateEmptyState() {
+        if (layoutEmpty != null) {
+            layoutEmpty.setVisibility(messages.isEmpty() ? View.VISIBLE : View.GONE);
+        }
     }
 
     // ================== 设置：语音播报开关 / 服务器地址 ==================
@@ -163,8 +192,105 @@ public class ChatUiManager {
 
         // 先把用户的问题显示到列表里，再交给后端
         adapter.add(new ChatMessage(ChatMessage.Role.USER, question, null, ChatMessage.Status.DONE));
+        updateEmptyState();
         scrollToBottom();
-        askBackend(question, null);
+        askBackendStreaming(question);
+    }
+
+    /**
+     * 文本提问：走流式接口（/api/chat/stream），边生成边显示。
+     *
+     * 为什么单独一条路：语音提问必须等整段音频一起回来，没法流式；
+     * 文本提问则可以先把字铺出来，首字延迟从 1~3 秒降到 0.3 秒左右。
+     */
+    private void askBackendStreaming(String question) {
+        final ChatMessage pending = new ChatMessage(
+                ChatMessage.Role.AI, "", null, ChatMessage.Status.LOADING);
+        adapter.add(pending);
+        updateEmptyState();
+        scrollToBottom();
+        showThinking();
+
+        final StringBuilder buffer = new StringBuilder();
+        apiClient.streamText(question, sessionId, new ChatApi.StreamCallback() {
+            @Override
+            public void onMeta(List<String> sources) {
+                if (sources != null && !sources.isEmpty()) {
+                    pending.setSources(sources);
+                    refreshMessage(pending);
+                }
+            }
+
+            @Override
+            public void onDelta(String text) {
+                if (text == null || text.isEmpty()) {
+                    return;
+                }
+                hideStatus();      // 已经开始出字了，"思考中"就撤掉
+                buffer.append(text);
+                pending.setText(buffer.toString());
+                pending.setStatus(ChatMessage.Status.DONE);
+                refreshMessage(pending);
+                scrollToBottom();
+            }
+
+            @Override
+            public void onDone(String answer) {
+                String finalText = (answer == null || answer.isEmpty())
+                        ? buffer.toString() : answer;
+                pending.setText(finalText);
+                pending.setStatus(ChatMessage.Status.DONE);
+                refreshMessage(pending);
+                scrollToBottom();
+                hideStatus();
+                // 语音播报：和以前一样，开关关掉就只显示文字
+                if (isVoiceReplyEnabled() && !finalText.isEmpty()) {
+                    speak(finalText);
+                }
+            }
+
+            @Override
+            public void onFailure(String message) {
+                pending.setText(message);
+                pending.setStatus(ChatMessage.Status.ERROR);
+                refreshMessage(pending);
+                scrollToBottom();
+                hideStatus();
+                showToast(message);
+            }
+        });
+    }
+
+    // ================== 历史会话 ==================
+
+    /** 切到某个历史会话：把后端存的消息拉回来铺到界面上 */
+    public void loadHistorySession(String targetSessionId) {
+        apiClient.loadMessages(targetSessionId, new ChatApi.MessagesCallback() {
+            @Override
+            public void onMessages(List<ChatMessage> loaded) {
+                sessionId = targetSessionId;
+                messages.clear();
+                messages.addAll(loaded);
+                adapter.notifyDataSetChanged();
+                updateEmptyState();
+                if (!messages.isEmpty()) {
+                    scrollToBottom();
+                }
+            }
+
+            @Override
+            public void onFailure(String message) {
+                showToast(message);
+            }
+        });
+    }
+
+    /** 开一个新对话：清空界面，换一个新会话编号 */
+    public void startNewSession(String newSessionId) {
+        sessionId = newSessionId;
+        messages.clear();
+        adapter.notifyDataSetChanged();
+        updateEmptyState();
     }
 
     /** 点麦克风按钮：没在录就开始录，正在录就停止 */

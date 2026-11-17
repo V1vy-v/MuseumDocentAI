@@ -200,6 +200,19 @@ def _sync(col) -> dict:
     files = _scan_files()
     manifest = _load_json(_manifest_path(), {})
 
+    # 防御：集合被重建/损坏时里面是空的，但清单还记着“全都建过”，
+    # 增量同步就会什么都不做，检索却搜不到东西（实测踩过：doc_count=1、清单 585 个文件）。
+    # 不变量：每个文件至少切出 1 块，所以集合条数必须 ≥ 清单里的文件数。
+    if manifest:
+        try:
+            doc_count = int(getattr(col.stats, "doc_count", 0))
+        except Exception:                       # noqa: BLE001 —— 统计接口不可用就不做这项检查
+            doc_count = None
+        if doc_count is not None and doc_count < len(manifest):
+            print(f"[向量库] 集合内只有 {doc_count} 条、清单记着 {len(manifest)} 个文件 "
+                  f"→ 判定索引丢失，改为全量重建")
+            manifest = {}
+
     removed = [rel for rel in manifest if rel not in files]
     changed = [rel for rel in files if manifest.get(rel, {}).get("sha1") != files[rel]["sha1"]]
 
@@ -320,6 +333,25 @@ def _url(rel_path: str) -> str:
     return config.KB_URL_PREFIX + quote(rel_path, safe="/")
 
 
+def _intent_headings(question: str) -> tuple:
+    """问题意图 → 应该优先命中的小节名。
+
+    "故宫博物院开放时间"这类问题，卡片里真正写答案的是"参观信息"小节，
+    但它的向量距离往往不如开头那段馆情介绍。用这个小表把答案段落顶上来。
+    """
+    rules = (
+        (("开放时间", "几点", "闭馆", "开馆", "营业"), ("参观信息", "参观")),
+        (("门票", "票价", "预约", "购票", "预约方式"), ("参观信息", "门票")),
+        (("地址", "在哪", "怎么走", "交通", "馆址"), ("参观信息", "馆址")),
+        (("展厅", "陈列", "路线", "参观路线", "看点"), ("展厅", "路线", "陈列")),
+    )
+    hits = []
+    for keywords, headings in rules:
+        if any(k in question for k in keywords):
+            hits.extend(headings)
+    return tuple(dict.fromkeys(hits))
+
+
 def search(question: str, topk: int = None) -> list:
     """混合检索：向量距离当闸门，FTS 参与排序。
 
@@ -380,6 +412,17 @@ def search(question: str, topk: int = None) -> list:
         for rank, doc_id in enumerate(fts_ids):
             if doc_id in fused:
                 fused[doc_id] += 1.0 / (config.RRF_RANK_CONSTANT + rank + 1)
+
+        # 4.5) 意图偏置：观众问"开放时间/门票/地址"时，真正写着这些的
+        #      是"参观信息"小节，但向量更容易把卡片开头介绍排上来。
+        #      这里对命中对应小节的块加一点分，保证答案出自正确的那一段。
+        intent_headings = _intent_headings(question)
+        if intent_headings:
+            boost = 1.0 / (config.RRF_RANK_CONSTANT + 1)      # 约等于一次排名第一的加分
+            for doc_id in fused:
+                heading = candidates[doc_id]["fields"].get("heading") or ""
+                if any(word in heading for word in intent_headings):
+                    fused[doc_id] += boost
 
         ranked = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)
 

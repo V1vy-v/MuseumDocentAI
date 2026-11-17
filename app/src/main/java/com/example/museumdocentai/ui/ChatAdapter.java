@@ -46,12 +46,14 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MessageViewHol
     /** 一个气泡条目里包含的控件 */
     static class MessageViewHolder extends RecyclerView.ViewHolder {
         final LinearLayout root;
+        final TextView avatar;
         final TextView bubble;
         final TextView sources;
 
         MessageViewHolder(View itemView) {
             super(itemView);
             root = itemView.findViewById(R.id.layout_bubble_item);
+            avatar = itemView.findViewById(R.id.avatar);
             bubble = itemView.findViewById(R.id.text_bubble);
             sources = itemView.findViewById(R.id.text_sources);
         }
@@ -70,20 +72,18 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MessageViewHol
         ChatMessage message = messages.get(position);
         boolean isUser = message.getRole() == ChatMessage.Role.USER;
 
-        // 对齐方式：用户靠右、AI 靠左
+        // 对齐方式：用户靠右（不显示头像）、AI 靠左（带"馆"字头像）
         holder.root.setGravity(isUser ? Gravity.END : Gravity.START);
+        holder.avatar.setVisibility(isUser ? View.GONE : View.VISIBLE);
 
-        // 画气泡背景（圆角）：用户深色、AI 浅色
-        GradientDrawable background = new GradientDrawable();
-        background.setCornerRadius(dp(16));
+        // 气泡样式：用户品牌色、AI 白色卡片（背景用 drawable 里的圆角+描边）
         if (isUser) {
-            background.setColor(Color.parseColor("#1F5FA8"));
+            holder.bubble.setBackgroundResource(R.drawable.bubble_user);
             holder.bubble.setTextColor(Color.WHITE);
         } else {
-            background.setColor(Color.parseColor("#EDEFF2"));
-            holder.bubble.setTextColor(Color.parseColor("#212121"));
+            holder.bubble.setBackgroundResource(R.drawable.bubble_ai);
+            holder.bubble.setTextColor(context.getColor(R.color.text_primary));
         }
-        holder.bubble.setBackground(background);
 
         // 气泡文字：按消息状态显示
         if (message.getStatus() == ChatMessage.Status.LOADING) {
@@ -95,11 +95,11 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MessageViewHol
             holder.bubble.setAlpha(1f);
             if (message.getStatus() == ChatMessage.Status.ERROR) {
                 // 出错：红字提示
-                holder.bubble.setTextColor(Color.parseColor("#B00020"));
+                holder.bubble.setTextColor(context.getColor(R.color.error));
             }
         }
 
-        // 资料来源小字：只有 AI 回答且带来源时显示
+        // 资料来源：只有 AI 回答且带来源时显示
         List<String> sources = message.getSources();
         if (!isUser && sources != null && !sources.isEmpty()) {
             holder.sources.setText(context.getString(

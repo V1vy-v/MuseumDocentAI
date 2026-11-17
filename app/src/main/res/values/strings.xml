@@ -1,11 +1,17 @@
 <resources>
     <string name="app_name">MuseumDocentAI</string>
+    <string name="app_title">博物馆讲解助手</string>
+    <string name="app_subtitle">全国博物馆资料库</string>
+    <string name="icon_history">🕘</string>
+    <string name="icon_browse">📚</string>
+    <string name="icon_settings">⚙</string>
+    <string name="empty_icon">🏛</string>
 
     <!-- ====== 界面文字（角色 A） ====== -->
     <string name="hint_question">输入你的问题…</string>
-    <string name="btn_send">发送</string>
-    <string name="btn_record">语音</string>
-    <string name="btn_record_stop">停止</string>
+    <string name="btn_send">➤</string>
+    <string name="btn_record">🎤</string>
+    <string name="btn_record_stop">■</string>
     <string name="status_thinking">思考中…</string>
     <string name="status_recording">正在录音…点击停止</string>
     <string name="source_label">来源：%1$s</string>
@@ -29,4 +35,35 @@
     <string name="toast_play_failed">语音播放失败</string>
     <string name="err_network">网络连接失败，请检查网络</string>
     <string name="err_server">服务返回数据异常</string>
+
+    <!-- ====== 资料库（手动检索，不经过 AI） ====== -->
+    <string name="btn_browse">资料库</string>
+    <string name="browse_title">资料库</string>
+    <string name="browse_subtitle">不经过 AI · 直接翻原文</string>
+    <string name="browse_back">返回</string>
+    <string name="browse_hint">搜文物或博物馆，如「青铜剑」「故宫」</string>
+    <string name="browse_search">搜索</string>
+    <string name="browse_kind_all">全部</string>
+    <string name="browse_kind_museum">博物馆</string>
+    <string name="browse_kind_artifact">文物</string>
+    <string name="browse_loading">加载中…</string>
+    <string name="browse_empty">没有找到相关资料，换个关键词试试</string>
+    <string name="browse_count">共 %1$d 条</string>
+    <string name="browse_close">关闭</string>
+    <string name="doc_image_desc">文物实物照片</string>
+
+    <!-- ====== 空态引导 ====== -->
+    <string name="avatar_ai">馆</string>
+    <string name="empty_title">试试这样问我</string>
+    <string name="empty_hint">点一下即可提问，也可以直接打字或按语音</string>
+    <string name="suggest_1">越王勾践剑是什么时期的文物？</string>
+    <string name="suggest_2">曾侯乙编钟在哪个博物馆？</string>
+    <string name="suggest_3">故宫博物院有什么名画？</string>
+
+    <!-- ====== 历史会话 ====== -->
+    <string name="btn_history">历史</string>
+    <string name="history_title">历史对话</string>
+    <string name="history_hint">点击可恢复之前的对话</string>
+    <string name="history_empty">还没有历史对话</string>
+    <string name="btn_new_session">＋ 新对话</string>
 </resources>

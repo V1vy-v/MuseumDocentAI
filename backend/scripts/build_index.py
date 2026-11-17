@@ -63,9 +63,14 @@ if __name__ == "__main__":
     # 增量同步会认为"全都建过了"，结果建出一个空索引（实测踩过）。
     # 所以索引目录不存在就把 manifest 一并清掉，强制按资料目录重建。
     manifest = INDEX_DIR.parent / (INDEX_DIR.name + ".manifest.json")
-    if not INDEX_DIR.exists() and manifest.exists():
-        print(f"[修正] 索引目录不存在但清单还在，已删除清单 {manifest.name}，将全量重建")
-        manifest.unlink()
+
+    # 另一个坑：zvec 的"删旧块 + 插新块"在增量场景下不可靠（实测改了 327 份馆卡后，
+    # 索引只剩 854 条、馆卡全部检索不到）。手工建库时干脆全量重建，代价只有 40 秒左右。
+    import shutil
+    print("[重建] 清空旧索引与清单，全量重建（避免增量同步的坑）")
+    shutil.rmtree(INDEX_DIR, ignore_errors=True)
+    manifest.unlink(missing_ok=True)
+    (INDEX_DIR.parent / (INDEX_DIR.name + ".dim.json")).unlink(missing_ok=True)
 
     print(f"资料目录：{config.KNOWLEDGE_BASE_DIR}")
     print(f"索引目录：{INDEX_DIR}")

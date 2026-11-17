@@ -29,6 +29,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 资料库：手动检索资料原文，不经过大模型 -->
+        <activity
+            android:name=".BrowseActivity"
+            android:exported="false"
+            android:label="@string/browse_title"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>

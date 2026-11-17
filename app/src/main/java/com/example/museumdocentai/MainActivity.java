@@ -84,12 +84,12 @@ public class MainActivity extends AppCompatActivity {
         // 顶栏
         findViewById(R.id.btn_drawer).setOnClickListener(v -> openDrawer());
         findViewById(R.id.btn_new_chat).setOnClickListener(v -> startNewSession());
+        findViewById(R.id.btn_settings).setOnClickListener(v -> uiManager.showServerDialog());
 
         // 抽屉
         drawer = findViewById(R.id.drawer);
         scrim = findViewById(R.id.scrim);
         scrim.setOnClickListener(v -> closeDrawer());
-        findViewById(R.id.btn_drawer_settings).setOnClickListener(v -> uiManager.showServerDialog());
 
         editHistorySearch = findViewById(R.id.edit_history_search);
         editHistorySearch.addTextChangedListener(new TextWatcher() {

@@ -111,7 +111,7 @@ public class ChatUiManager {
         btnVoice.setOnClickListener(v -> toggleVoiceReply());
 
         // 抽屉底部的"服务器"按钮：改后端地址（真机测试要填电脑的局域网 IP）
-        btnSettings = activity.findViewById(R.id.btn_drawer_settings);
+        btnSettings = activity.findViewById(R.id.btn_settings);
         if (btnSettings != null) {
             btnSettings.setOnClickListener(v -> showServerDialog());
         }

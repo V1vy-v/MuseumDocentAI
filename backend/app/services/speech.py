@@ -36,6 +36,25 @@ _MAX_TOTAL = 600
 
 _STOP = object()        # 队列哨兵：收到它就退出，不再合成
 
+# 第一段可以短一点：句号往往要等模型写完一整句（20~40 字），而观众等的是
+# "多快听到声音"。所以只在【第一句】允许在逗号处切开；后面的句子仍按句末
+# 标点切，避免整段听起来一顿一顿。
+_CLAUSE_END = re.compile(r"[，,、：:]")
+_MIN_FIRST = 10          # 第一段最短 10 字，太短气口不自然
+
+
+def _first_clause(text: str) -> tuple:
+    """从累积文本里切出"第一段"（到第一个逗号为止）。
+
+    返回 (第一段文本, 剩余文本)；还没等到逗号、或逗号太靠前时返回 ("", text)。
+    """
+    for m in _CLAUSE_END.finditer(text):
+        if m.end() >= _MIN_FIRST:
+            head, rest = text[:m.end()], text[m.end():]
+            # 逗号留在上一段会让合成停顿更自然
+            return head, rest
+    return "", text
+
 
 def split_sentences(text: str, *, final: bool = False) -> tuple:
     """把累积文本切成 (完整句子列表, 还没说完的尾巴)。
@@ -104,6 +123,15 @@ class SentenceSpeaker:
         if not self._accepting:
             return
         self._buf += delta
+
+        # 还没送出过任何一段时，允许在逗号处切一刀，让第一句更早出声
+        if self._index == 0 and not self._pending:
+            early, rest = _first_clause(self._buf)
+            if early:
+                self._buf = rest
+                self._emit_text(early)
+                return
+
         ready, self._buf = split_sentences(self._buf)
         self._enqueue(ready)
 

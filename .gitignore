@@ -45,3 +45,21 @@ pypdf_lib/
 
 # Python 后端的本地虚拟环境
 backend/.venv/
+
+# Web 前端（Vue + Vite）
+# node_modules 是装出来的，dist 是构建产物 —— 都不入库，
+# 换机器只要 npm install && npm run build 就能得到同样的 dist。
+web/node_modules/
+web/dist/
+web/.vite/
+web/coverage/
+# 依赖与缓存的附带产物
+*.tsbuildinfo
+.eslintcache
+npm-debug.log*
+yarn-error.log*
+# 本地环境变量（可能含密钥，绝不入库；示例值请写在 .env.example 里）
+web/.env.local
+web/.env.*.local
+*.local
+

@@ -1,0 +1,25 @@
+{
+  "name": "museum-docent-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "博物馆导览问答 · Web 前端（对话历史 + 流式问答）",
+  "scripts": {
+    "dev": "vite",
+    "dev:lan": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "dompurify": "^3.2.7",
+    "marked": "^16.4.1",
+    "vue": "^3.5.24"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.13",
+    "vue-tsc": "^3.1.4"
+  }
+}

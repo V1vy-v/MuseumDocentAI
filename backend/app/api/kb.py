@@ -89,7 +89,7 @@ def _snippet(text: str, words: set, width: int = 90) -> str:
     而且博物馆卡正文第一行就是 "# 上海博物馆"，会截出"…"这种没用的结果。
     """
     body = [ln.strip() for ln in text.splitlines()
-            if ln.strip() and not ln.lstrip().startswith(("#", ">"))
+            if ln.strip() and not ln.lstrip().startswith(("#", ">", "-", "·"))
             and "编号" not in ln and not ln.startswith("馆藏：")]
     plain = re.sub(r"[*>_`\[\]()!]", " ", " ".join(body))
     plain = re.sub(r"\s+", " ", plain).strip()
@@ -108,9 +108,16 @@ def _snippet(text: str, words: set, width: int = 90) -> str:
 
 
 def _words(q: str) -> set:
-    """中文按 2~3 字滑窗切，英文数字按词切——和关键词检索保持同一套口径。"""
+    """中文按 2~3 字滑窗切，英文数字按词切——和关键词检索保持同一套口径。
+
+    单字查询（比如只输了一个"剑"）切不出 2 字片段，必须把整字也收进去，
+    否则 words 为空、过滤条件失效，会把整个资料库都返回回来。
+    """
     out = set()
     for run in re.findall(r"[\u4e00-\u9fff]+", q):
+        if len(run) < 2:
+            out.add(run)
+            continue
         for n in (2, 3):
             out.update(run[i:i + n] for i in range(len(run) - n + 1))
     out.update(re.findall(r"[A-Za-z0-9]{2,}", q))

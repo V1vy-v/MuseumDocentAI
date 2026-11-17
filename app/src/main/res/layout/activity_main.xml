@@ -70,7 +70,7 @@
                 android:contentDescription="@string/icon_new_chat"
                 android:text="@string/icon_new_chat"
                 android:textColor="@color/ds_text"
-                android:textSize="18sp"
+                android:textSize="22sp"
                 tools:ignore="SpeakableTextPresentCheck" />
         </LinearLayout>
 

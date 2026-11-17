@@ -7,7 +7,7 @@
     <string name="icon_settings">⚙</string>
     <string name="empty_icon">🏛</string>
     <string name="icon_drawer">☰</string>
-    <string name="icon_new_chat">✎</string>
+    <string name="icon_new_chat">⊕</string>
     <string name="toast_new_chat">已开始新对话</string>
     <string name="ai_disclaimer">回答由 AI 生成，仅供参考</string>
     <string name="empty_greeting">你好，让我们开始聊天吧</string>

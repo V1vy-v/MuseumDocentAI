@@ -70,7 +70,16 @@ def _meta(rel: Path) -> dict:
         museum = rel.stem
         province = parts[-2] if len(parts) >= 2 else ""
     return {"kind": "artifact" if is_artifact else "museum",
-            "province": province, "museum": museum}
+            "province": province, "museum": museum, "category": ""}
+
+
+def _category(text: str) -> str:
+    """文物卡里的"类别"（青铜器/陶瓷/书画…），用于按类型筛选。
+
+    博物馆卡没有这个字段，返回空串（筛选时按"全部"处理）。
+    """
+    m = re.search(r"\*\*类别\*\*[：:]\s*(.+)", text)
+    return m.group(1).strip() if m else ""
 
 
 def _snippet(text: str, words: set, width: int = 90) -> str:
@@ -80,8 +89,8 @@ def _snippet(text: str, words: set, width: int = 90) -> str:
     而且博物馆卡正文第一行就是 "# 上海博物馆"，会截出"…"这种没用的结果。
     """
     body = [ln.strip() for ln in text.splitlines()
-            if ln.strip() and not ln.lstrip().startswith("#")
-            and "资料馆编号" not in ln]
+            if ln.strip() and not ln.lstrip().startswith(("#", ">"))
+            and "编号" not in ln and not ln.startswith("馆藏：")]
     plain = re.sub(r"[*>_`\[\]()!]", " ", " ".join(body))
     plain = re.sub(r"\s+", " ", plain).strip()
     if not plain:
@@ -109,16 +118,24 @@ def _words(q: str) -> set:
 
 
 @router.get("/api/kb/search")
-def kb_search(q: str = Query("", description="关键词；留空则按类型列出资料"),
+def kb_search(q: str = Query("", description="关键词；留空则按条件浏览"),
               kind: str = Query("", description="museum / artifact；留空=全部"),
-              limit: int = Query(30, ge=1, le=200)):
-    """关键词检索知识库，直接返回标题+摘要（不调用任何模型）。"""
+              province: str = Query("", description="省份，如 湖北省；留空=全部"),
+              category: str = Query("", description="文物类别，如 青铜器；留空=全部"),
+              limit: int = Query(30, ge=1, le=200),
+              offset: int = Query(0, ge=0, description="分页起点")):
+    """检索知识库，返回标题+摘要+筛选维度（不调用任何模型）。
+
+    返回里的 facets 是"筛选项 + 各自数量"，前端拿它渲染省份/类别的选项，
+    不用再单独请求一次；数量会跟着当前的关键词/类型动态变化。
+    """
     root = Path(config.KNOWLEDGE_BASE_DIR)
     if not root.exists():
-        return {"query": q, "total": 0, "items": []}
+        return {"query": q, "total": 0, "offset": offset, "limit": limit,
+                "items": [], "facets": {"provinces": [], "categories": []}}
 
     words = _words(q)
-    items = []
+    matched = []        # 过了"关键词 + 类型"的资料（facets 也从这里统计）
     for path in root.rglob("*"):
         if path.suffix.lower() not in _SUFFIX or path.name.upper() == "README.MD":
             continue
@@ -142,19 +159,51 @@ def kb_search(q: str = Query("", description="关键词；留空则按类型列�
         else:
             score = 0
 
-        items.append({
+        if meta["kind"] == "artifact":
+            meta["category"] = _category(text)
+        matched.append({
             "title": title, "path": rel.as_posix(), "score": score,
-            "kind": meta["kind"], "province": meta["province"], "museum": meta["museum"],
+            "kind": meta["kind"], "province": meta["province"],
+            "museum": meta["museum"], "category": meta["category"],
             "snippet": _snippet(text, words),
         })
 
-    # 有关键词按相关度排；没关键词按路径排（博物馆卡在前，读起来更顺）
+    # 筛选维度：省份对所有资料统计；类别只对文物卡统计（博物馆卡没有类别）
+    provinces = {}
+    categories = {}
+    for it in matched:
+        if it["province"]:
+            provinces[it["province"]] = provinces.get(it["province"], 0) + 1
+        if it["category"]:
+            categories[it["category"]] = categories.get(it["category"], 0) + 1
+
+    def _facets(counter):
+        return [{"name": k, "count": v}
+                for k, v in sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+    # 按具体条件过滤
+    items = [it for it in matched
+             if (not province or it["province"] == province)
+             and (not category or it["category"] == category)]
+
+    # 有关键词按相关度排；没关键词按"博物馆优先 + 省份 + 名称"排
     if words:
         items.sort(key=lambda it: (-it["score"], it["title"]))
     else:
         items.sort(key=lambda it: (it["kind"] != "museum", it["province"], it["title"]))
 
-    return {"query": q, "total": len(items), "items": items[:limit]}
+    total = len(items)
+    page = items[offset:offset + limit]
+    return {"query": q, "total": total, "offset": offset, "limit": limit,
+            "items": page,
+            "facets": {"provinces": _facets(provinces), "categories": _facets(categories)}}
+
+
+@router.get("/api/kb/filters")
+def kb_filters():
+    """资料库的筛选维度（进入页面时拿一次，避免空搜索时算两遍）。"""
+    data = kb_search(q="", kind="", province="", category="", limit=1, offset=0)
+    return data["facets"]
 
 
 @router.get("/api/kb/doc")

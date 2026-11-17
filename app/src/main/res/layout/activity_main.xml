@@ -46,6 +46,19 @@
             android:layout_height="wrap_content"
             android:checked="true" />
 
+        <!-- 历史对话：切换/恢复之前的会话 -->
+        <Button
+            android:id="@+id/btn_history"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:text="@string/btn_history"
+            android:textColor="@android:color/white"
+            android:textSize="12sp" />
+
         <!-- 资料库：不经过 AI，直接按关键词翻资料（检索链路不消耗 token） -->
         <Button
             android:id="@+id/btn_browse"
@@ -82,6 +95,58 @@
         android:padding="8dp"
         app:layout_constraintBottom_toTopOf="@id/layout_status"
         app:layout_constraintTop_toBottomOf="@id/layout_title" />
+
+    <!-- 空态引导：还没提问时显示，点一下示例问题直接发送（有消息后自动隐藏） -->
+    <LinearLayout
+        android:id="@+id/layout_empty"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:padding="20dp"
+        app:layout_constraintBottom_toTopOf="@id/layout_status"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layout_title">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingBottom="4dp"
+            android:text="@string/empty_title"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingBottom="14dp"
+            android:text="@string/empty_hint"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btn_suggest_1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/suggest_1"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btn_suggest_2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/suggest_2"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btn_suggest_3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/suggest_3"
+            android:textSize="13sp" />
+    </LinearLayout>
 
     <!-- 状态提示行：等待回答时转圈+“思考中…”，录音时只显示文字 -->
     <LinearLayout

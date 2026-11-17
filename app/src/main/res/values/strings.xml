@@ -43,4 +43,17 @@
     <string name="browse_empty">没有找到相关资料，换个关键词试试</string>
     <string name="browse_count">共 %1$d 条</string>
     <string name="browse_close">关闭</string>
+
+    <!-- ====== 空态引导 ====== -->
+    <string name="empty_title">试试这样问我</string>
+    <string name="empty_hint">点一下即可提问，也可以直接打字或按语音</string>
+    <string name="suggest_1">越王勾践剑是什么时期的文物？</string>
+    <string name="suggest_2">曾侯乙编钟在哪个博物馆？</string>
+    <string name="suggest_3">故宫博物院有什么名画？</string>
+
+    <!-- ====== 历史会话 ====== -->
+    <string name="btn_history">历史</string>
+    <string name="history_title">历史对话</string>
+    <string name="history_empty">还没有历史对话</string>
+    <string name="btn_new_session">新对话</string>
 </resources>

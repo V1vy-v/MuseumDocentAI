@@ -20,15 +20,19 @@ public class KbItem {
     public final String province;
     /** 所属博物馆（文物卡是收藏单位，博物馆卡就是自己） */
     public final String museum;
+    /** 文物类别（青铜器/书画/陶瓷…），博物馆卡为空 */
+    public final String category;
     /** 列表里显示的一小段摘要 */
     public final String snippet;
 
-    public KbItem(String title, String path, String kind, String province, String museum, String snippet) {
+    public KbItem(String title, String path, String kind, String province,
+                  String museum, String category, String snippet) {
         this.title = title;
         this.path = path;
         this.kind = kind;
         this.province = province;
         this.museum = museum;
+        this.category = category;
         this.snippet = snippet;
     }
 
@@ -40,6 +44,7 @@ public class KbItem {
                 json.optString("kind", ""),
                 json.optString("province", ""),
                 json.optString("museum", ""),
+                json.optString("category", ""),
                 json.optString("snippet", ""));
     }
 
@@ -47,7 +52,7 @@ public class KbItem {
         return "artifact".equals(kind);
     }
 
-    /** 列表里的第二行："文物 · 湖北省 · 湖北省博物馆" */
+    /** 列表里的第二行："文物 · 湖北省 · 湖北省博物馆 · 青铜器" */
     public String metaLine() {
         StringBuilder sb = new StringBuilder(isArtifact() ? "文物" : "博物馆");
         if (!province.isEmpty()) {
@@ -55,6 +60,9 @@ public class KbItem {
         }
         if (isArtifact() && !museum.isEmpty()) {
             sb.append(" · ").append(museum);
+        }
+        if (!category.isEmpty()) {
+            sb.append(" · ").append(category);
         }
         return sb.toString();
     }

@@ -39,6 +39,20 @@ public class KbAdapter extends RecyclerView.Adapter<KbAdapter.Holder> {
         notifyDataSetChanged();
     }
 
+    /** 分页加载：把下一页追加到末尾，不闪烁已有内容 */
+    public void append(List<KbItem> list) {
+        if (list == null || list.isEmpty()) {
+            return;
+        }
+        int start = items.size();
+        items.addAll(list);
+        notifyItemRangeInserted(start, list.size());
+    }
+
+    public int size() {
+        return items.size();
+    }
+
     @NonNull
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {

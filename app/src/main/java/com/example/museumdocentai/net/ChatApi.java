@@ -1,6 +1,9 @@
 package com.example.museumdocentai.net;
 
+import com.example.museumdocentai.model.ChatMessage;
+import com.example.museumdocentai.model.FilterItem;
 import com.example.museumdocentai.model.KbItem;
+import com.example.museumdocentai.model.SessionInfo;
 
 import java.io.File;
 import java.util.List;
@@ -65,7 +68,14 @@ public interface ChatApi {
 
     /** 资料检索的回调 */
     interface KbListCallback {
-        void onList(List<KbItem> items, int total);
+        /**
+         * @param items      当前这一页的资料
+         * @param total      满足条件的总数（用来判断还有没有下一页）
+         * @param provinces  省份筛选项（带数量）
+         * @param categories 文物类别筛选项（带数量）
+         */
+        void onList(List<KbItem> items, int total,
+                    List<FilterItem> provinces, List<FilterItem> categories);
 
         void onFailure(String message);
     }
@@ -80,13 +90,56 @@ public interface ChatApi {
     /**
      * 按关键词检索资料库。
      *
-     * @param query 关键词；留空表示按类型列出（浏览模式）
-     * @param kind  "museum"/"artifact"；空串表示全部
+     * @param query    关键词；留空表示按条件浏览
+     * @param kind     "museum"/"artifact"；空串表示全部
+     * @param province 省份；空串表示全部
+     * @param category 文物类别；空串表示全部
+     * @param offset   分页起点（0 表示第一页）
      */
-    void searchKb(String query, String kind, int limit, KbListCallback callback);
+    void searchKb(String query, String kind, String province, String category,
+                  int limit, int offset, KbListCallback callback);
 
     /** 取一份资料的原文（path 就是检索结果里的 path 字段） */
     void openKbDoc(String path, KbDocCallback callback);
+
+    // ======== 流式问答 + 会话历史 ========
+
+    /**
+     * 流式问答：后端边生成边推（SSE），界面可以一个字一个字地显示。
+     * 失败时调用 onFailure，界面降级为普通请求或提示错误。
+     */
+    interface StreamCallback {
+        /** 先给来源（可能在文字之前就到达），界面可以先显示"来源" */
+        void onMeta(List<String> sources);
+
+        /** 收到一段新增文字（要求在主线程调用） */
+        void onDelta(String text);
+
+        /** 生成完成，answer 是完整回答 */
+        void onDone(String answer);
+
+        void onFailure(String message);
+    }
+
+    /** 历史会话列表 */
+    interface SessionListCallback {
+        void onList(List<SessionInfo> sessions);
+
+        void onFailure(String message);
+    }
+
+    /** 某个会话的历史消息（APP 重启后回填界面用） */
+    interface MessagesCallback {
+        void onMessages(List<ChatMessage> messages);
+
+        void onFailure(String message);
+    }
+
+    void streamText(String question, String sessionId, StreamCallback callback);
+
+    void listSessions(int limit, SessionListCallback callback);
+
+    void loadMessages(String sessionId, MessagesCallback callback);
 
     /** 设置后端地址；传空字符串表示恢复"自动尝试内置候选地址" */
     void setServerUrl(String url);

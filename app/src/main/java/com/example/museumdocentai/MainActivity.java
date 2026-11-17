@@ -1,9 +1,11 @@
 package com.example.museumdocentai;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -13,8 +15,12 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.example.museumdocentai.model.SessionInfo;
+import com.example.museumdocentai.net.ApiClient;
+import com.example.museumdocentai.net.ChatApi;
 import com.example.museumdocentai.ui.ChatUiManager;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -34,6 +40,9 @@ public class MainActivity extends AppCompatActivity {
     /** 界面与交互管理器 */
     private ChatUiManager uiManager;
 
+    /** 当前会话编号（切历史会话时会变） */
+    private String sessionId;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -48,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         // 会话编号：启动时生成一个随机串，整个对话过程复用（后端靠它记住上下文）
-        String sessionId = UUID.randomUUID().toString();
+        sessionId = UUID.randomUUID().toString();
         uiManager = new ChatUiManager(this, sessionId);
 
         // 按钮事件：转告给界面管理器处理
@@ -58,6 +67,45 @@ public class MainActivity extends AppCompatActivity {
         // 资料库：不经过 AI，直接按关键词翻资料原文
         findViewById(R.id.btn_browse).setOnClickListener(v ->
                 startActivity(new Intent(this, BrowseActivity.class)));
+
+        // 历史对话：从后端拉会话列表，点了就恢复
+        findViewById(R.id.btn_history).setOnClickListener(v -> showHistoryDialog());
+    }
+
+    /** 历史对话弹窗：第一项是"新对话"，其余是后端存过的会话 */
+    private void showHistoryDialog() {
+        ApiClient api = new ApiClient(this);
+        api.listSessions(30, new ChatApi.SessionListCallback() {
+            @Override
+            public void onList(List<SessionInfo> sessions) {
+                int count = sessions.size();
+                String[] items = new String[count + 1];
+                items[0] = getString(R.string.btn_new_session);
+                for (int i = 0; i < count; i++) {
+                    SessionInfo info = sessions.get(i);
+                    String title = info.title.isEmpty() ? getString(R.string.history_empty) : info.title;
+                    items[i + 1] = title + "\n" + info.metaLine();
+                }
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle(R.string.history_title)
+                        .setItems(items, (dialog, which) -> {
+                            if (which == 0) {
+                                sessionId = UUID.randomUUID().toString();
+                                uiManager.startNewSession(sessionId);
+                            } else {
+                                sessionId = sessions.get(which - 1).sessionId;
+                                uiManager.loadHistorySession(sessionId);
+                            }
+                        })
+                        .setNegativeButton(R.string.dialog_cancel, null)
+                        .show();
+            }
+
+            @Override
+            public void onFailure(String message) {
+                Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     /** 点麦克风按钮：有录音权限就直接录，没有就先申请 */

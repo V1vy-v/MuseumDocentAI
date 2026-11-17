@@ -6,7 +6,10 @@ import android.os.Looper;
 import android.util.Base64;
 
 import com.example.museumdocentai.R;
+import com.example.museumdocentai.model.ChatMessage;
+import com.example.museumdocentai.model.FilterItem;
 import com.example.museumdocentai.model.KbItem;
+import com.example.museumdocentai.model.SessionInfo;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -190,17 +193,25 @@ public class ApiClient implements ChatApi {
     // ======== 资料库：手动检索（不经过大模型，也不消耗 token） ========
 
     @Override
-    public void searchKb(String query, String kind, int limit, KbListCallback callback) {
+    public void searchKb(String query, String kind, String province, String category,
+                         int limit, int offset, KbListCallback callback) {
         executor.execute(() -> {
-            String path = "/api/kb/search?limit=" + limit;
+            StringBuilder path = new StringBuilder("/api/kb/search?limit=").append(limit)
+                    .append("&offset=").append(offset);
             if (query != null && !query.trim().isEmpty()) {
-                path += "&q=" + encode(query.trim());
+                path.append("&q=").append(encode(query.trim()));
             }
             if (kind != null && !kind.isEmpty()) {
-                path += "&kind=" + encode(kind);
+                path.append("&kind=").append(encode(kind));
+            }
+            if (province != null && !province.isEmpty()) {
+                path.append("&province=").append(encode(province));
+            }
+            if (category != null && !category.isEmpty()) {
+                path.append("&category=").append(encode(category));
             }
             try {
-                JSONObject json = new JSONObject(getJson(path));
+                JSONObject json = new JSONObject(getJson(path.toString()));
                 JSONArray array = json.optJSONArray("items");
                 List<KbItem> items = new ArrayList<>();
                 if (array != null) {
@@ -211,9 +222,18 @@ public class ApiClient implements ChatApi {
                         }
                     }
                 }
+                // 筛选维度（省份/类别 + 数量）跟着返回，界面直接拿来渲染下拉框
+                JSONObject facets = json.optJSONObject("facets");
+                List<FilterItem> provinces = FilterItem.listFrom(
+                        facets == null ? null : facets.optJSONArray("provinces"));
+                List<FilterItem> categories = FilterItem.listFrom(
+                        facets == null ? null : facets.optJSONArray("categories"));
+
                 final List<KbItem> result = items;
                 final int total = json.optInt("total", result.size());
-                mainHandler.post(() -> callback.onList(result, total));
+                final List<FilterItem> finalProvinces = provinces;
+                final List<FilterItem> finalCategories = categories;
+                mainHandler.post(() -> callback.onList(result, total, finalProvinces, finalCategories));
             } catch (IOException e) {
                 mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_network)));
             } catch (JSONException e) {
@@ -231,6 +251,7 @@ public class ApiClient implements ChatApi {
                 final String kind = json.optString("kind", "");
                 final String province = json.optString("province", "");
                 final String museum = json.optString("museum", "");
+                final String category = json.optString("category", "");
                 final String text = json.optString("text", "");
 
                 StringBuilder meta = new StringBuilder("artifact".equals(kind) ? "文物" : "博物馆");
@@ -240,8 +261,169 @@ public class ApiClient implements ChatApi {
                 if ("artifact".equals(kind) && !museum.isEmpty()) {
                     meta.append(" · ").append(museum);
                 }
+                if (!category.isEmpty()) {
+                    meta.append(" · ").append(category);
+                }
                 final String metaLine = meta.toString();
                 mainHandler.post(() -> callback.onDoc(title, metaLine, text));
+            } catch (IOException e) {
+                mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_network)));
+            } catch (JSONException e) {
+                mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_server)));
+            }
+        });
+    }
+
+    // ======== 流式问答 + 会话历史 ========
+
+    @Override
+    public void streamText(String question, String sessionId, StreamCallback callback) {
+        executor.execute(() -> {
+            JSONObject body = new JSONObject();
+            try {
+                body.put("question", question);
+                body.put("session_id", sessionId);
+            } catch (JSONException e) {
+                mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_server)));
+                return;
+            }
+            IOException lastError = null;
+            for (String base : baseUrlsToTry()) {
+                try {
+                    streamOnce(base, "/api/chat/stream", body.toString(), callback);
+                    workingBaseUrl = base;
+                    return;
+                } catch (IOException e) {
+                    lastError = e;
+                }
+            }
+            String message = lastError == null ? context.getString(R.string.err_network)
+                    : context.getString(R.string.err_network);
+            mainHandler.post(() -> callback.onFailure(message));
+        });
+    }
+
+    /** 读一整个 SSE 流：event: meta / delta / done / error */
+    private void streamOnce(String baseUrl, String path, String jsonBody, StreamCallback callback)
+            throws IOException {
+        HttpURLConnection connection = openConnection(baseUrl, path);
+        try {
+            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            connection.setRequestProperty("Accept", "text/event-stream");
+            connection.setDoOutput(true);
+            OutputStream out = connection.getOutputStream();
+            out.write(jsonBody.getBytes(StandardCharsets.UTF_8));
+            out.close();
+
+            if (connection.getResponseCode() >= 400) {
+                throw new IOException("HTTP " + connection.getResponseCode());
+            }
+
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+            String event = "";
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("event:")) {
+                    event = line.substring(6).trim();
+                } else if (line.startsWith("data:")) {
+                    dispatchSseEvent(event, line.substring(5).trim(), callback);
+                }
+            }
+            reader.close();
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private void dispatchSseEvent(String event, String payload, StreamCallback callback) {
+        try {
+            JSONObject json = new JSONObject(payload);
+            switch (event) {
+                case "meta": {
+                    List<String> sources = new ArrayList<>();
+                    JSONArray array = json.optJSONArray("sources");
+                    if (array != null) {
+                        for (int i = 0; i < array.length(); i++) {
+                            String one = array.optString(i, "");
+                            if (!one.isEmpty()) {
+                                sources.add(one);
+                            }
+                        }
+                    }
+                    mainHandler.post(() -> callback.onMeta(sources));
+                    break;
+                }
+                case "delta": {
+                    String text = json.optString("text", "");
+                    mainHandler.post(() -> callback.onDelta(text));
+                    break;
+                }
+                case "done": {
+                    String answer = json.optString("answer", "");
+                    mainHandler.post(() -> callback.onDone(answer));
+                    break;
+                }
+                case "error": {
+                    String error = json.optString("error", "");
+                    mainHandler.post(() -> callback.onFailure(
+                            error.isEmpty() ? context.getString(R.string.err_server) : error));
+                    break;
+                }
+                default:
+                    break;      // 未知事件忽略，保证向后兼容
+            }
+        } catch (JSONException ignored) {
+            // 单条事件解析失败不影响整条流
+        }
+    }
+
+    @Override
+    public void listSessions(int limit, SessionListCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject json = new JSONObject(getJson("/api/sessions?limit=" + limit));
+                final List<SessionInfo> sessions = SessionInfo.listFrom(json);
+                mainHandler.post(() -> callback.onList(sessions));
+            } catch (IOException e) {
+                mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_network)));
+            } catch (JSONException e) {
+                mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_server)));
+            }
+        });
+    }
+
+    @Override
+    public void loadMessages(String sessionId, MessagesCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject json = new JSONObject(
+                        getJson("/api/sessions/" + encode(sessionId) + "/messages"));
+                JSONArray array = json.optJSONArray("messages");
+                List<ChatMessage> messages = new ArrayList<>();
+                if (array != null) {
+                    for (int i = 0; i < array.length(); i++) {
+                        JSONObject one = array.optJSONObject(i);
+                        if (one == null) {
+                            continue;
+                        }
+                        String role = one.optString("role", "");
+                        String content = one.optString("content", "");
+                        List<String> sources = new ArrayList<>();
+                        JSONArray src = one.optJSONArray("sources");
+                        if (src != null) {
+                            for (int k = 0; k < src.length(); k++) {
+                                sources.add(src.optString(k, ""));
+                            }
+                        }
+                        ChatMessage.Role messageRole = "user".equals(role)
+                                ? ChatMessage.Role.USER : ChatMessage.Role.AI;
+                        messages.add(new ChatMessage(messageRole, content, sources,
+                                ChatMessage.Status.DONE));
+                    }
+                }
+                final List<ChatMessage> result = messages;
+                mainHandler.post(() -> callback.onMessages(result));
             } catch (IOException e) {
                 mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_network)));
             } catch (JSONException e) {

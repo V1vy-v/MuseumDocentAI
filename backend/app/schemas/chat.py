@@ -17,6 +17,10 @@ class ChatRequest(BaseModel):
     #   "keyword" 只用关键词匹配   "vector" 只用向量检索
     # 老前端不传这个字段，行为与以前完全一致。
     retrieval: str = ""
+    # 可选：流式接口要不要顺带合成语音（POST /api/chat/stream 用）。
+    # 置 True 时，服务端会边生成边按句合成，在事件流里插入 audio 事件，
+    # 不必等整段回答结束再调 /api/tts。默认 False，老前端行为不变。
+    with_audio: bool = False
 
 
 class ChatResponse(BaseModel):

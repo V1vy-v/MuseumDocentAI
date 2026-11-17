@@ -46,14 +46,12 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MessageViewHol
     /** 一个气泡条目里包含的控件 */
     static class MessageViewHolder extends RecyclerView.ViewHolder {
         final LinearLayout root;
-        final TextView avatar;
         final TextView bubble;
         final TextView sources;
 
         MessageViewHolder(View itemView) {
             super(itemView);
             root = itemView.findViewById(R.id.layout_bubble_item);
-            avatar = itemView.findViewById(R.id.avatar);
             bubble = itemView.findViewById(R.id.text_bubble);
             sources = itemView.findViewById(R.id.text_sources);
         }
@@ -72,18 +70,25 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MessageViewHol
         ChatMessage message = messages.get(position);
         boolean isUser = message.getRole() == ChatMessage.Role.USER;
 
-        // 对齐方式：用户靠右（不显示头像）、AI 靠左（带"馆"字头像）
+        // 对齐方式：用户靠右、AI 靠左；两边都不放头像（DeepSeek 风格）
         holder.root.setGravity(isUser ? Gravity.END : Gravity.START);
-        holder.avatar.setVisibility(isUser ? View.GONE : View.VISIBLE);
 
-        // 气泡样式：用户品牌色、AI 白色卡片（背景用 drawable 里的圆角+描边）
+        // 样式：用户是浅蓝气泡；AI 直接整段文字，没有气泡背景
+        LinearLayout.LayoutParams params =
+                (LinearLayout.LayoutParams) holder.bubble.getLayoutParams();
         if (isUser) {
             holder.bubble.setBackgroundResource(R.drawable.bubble_user);
-            holder.bubble.setTextColor(Color.WHITE);
+            holder.bubble.setPadding(dp(14), dp(10), dp(14), dp(10));
+            holder.bubble.setMaxWidth(dp(320));
+            params.width = LinearLayout.LayoutParams.WRAP_CONTENT;
         } else {
-            holder.bubble.setBackgroundResource(R.drawable.bubble_ai);
-            holder.bubble.setTextColor(context.getColor(R.color.text_primary));
+            holder.bubble.setBackground(null);
+            holder.bubble.setPadding(0, 0, 0, 0);
+            holder.bubble.setMaxWidth(Integer.MAX_VALUE);
+            params.width = LinearLayout.LayoutParams.MATCH_PARENT;
         }
+        holder.bubble.setLayoutParams(params);
+        holder.bubble.setTextColor(context.getColor(R.color.ds_text));
 
         // 气泡文字：按消息状态显示
         if (message.getStatus() == ChatMessage.Status.LOADING) {

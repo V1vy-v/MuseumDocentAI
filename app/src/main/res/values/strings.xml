@@ -1,11 +1,25 @@
 <resources>
     <string name="app_name">MuseumDocentAI</string>
-    <string name="app_title">博物馆讲解助手</string>
+    <string name="app_title">MuseumDocentAI</string>
     <string name="app_subtitle">全国博物馆资料库</string>
     <string name="icon_history">🕘</string>
     <string name="icon_browse">📚</string>
     <string name="icon_settings">⚙</string>
     <string name="empty_icon">🏛</string>
+    <string name="icon_drawer">☰</string>
+    <string name="icon_new_chat">⊕</string>
+    <string name="toast_new_chat">已开始新对话</string>
+    <string name="ai_disclaimer">回答由 AI 生成，仅供参考</string>
+    <string name="empty_greeting">你好，让我们开始聊天吧</string>
+    <string name="hint_question_ds">发消息或按住说话</string>
+    <string name="pill_voice_on">🔊</string>
+    <string name="pill_voice_off">🔇</string>
+    <string name="pill_browse">📚</string>
+    <string name="history_search_hint">搜索对话内容…</string>
+    <string name="history_group_today">今天</string>
+    <string name="history_group_week">7 天内</string>
+    <string name="history_group_month">30 天内</string>
+    <string name="history_group_older">更早</string>
 
     <!-- ====== 界面文字（角色 A） ====== -->
     <string name="hint_question">输入你的问题…</string>

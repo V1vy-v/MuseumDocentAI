@@ -1,19 +1,17 @@
 package com.example.museumdocentai;
 
 import android.Manifest;
-import android.app.Dialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.Window;
-import android.widget.TextView;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -29,28 +27,36 @@ import com.example.museumdocentai.net.ChatApi;
 import com.example.museumdocentai.ui.ChatUiManager;
 import com.example.museumdocentai.ui.HistoryAdapter;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 /**
- * 【角色 A 负责】页面入口：只做"组装"和"事件转发"。
+ * 【角色 A 负责】页面入口：组装界面、转发事件、管理左侧历史抽屉。
  *
- * 做什么：
- * 1. 组装：加载界面布局，创建 ChatUiManager（界面逻辑都在它那里）；
- * 2. 转发：把按钮点击、权限申请结果转告给 ChatUiManager；
- * 3. 权限：第一次点语音按钮时弹窗申请麦克风权限；
- * 4. 生成会话编号（多轮对话复用）。
+ * 布局参考 DeepSeek 手机端：白底极简顶栏（☰ / 标题 / ✎），
+ * 历史对话收进左侧抽屉，按"今天 / 7 天内 / 30 天内"分组。
  */
 public class MainActivity extends AppCompatActivity {
 
-    /** 录音权限的请求码：用来识别"麦克风权限申请"的回调 */
     private static final int REQUEST_RECORD_AUDIO = 1001;
 
-    /** 界面与交互管理器 */
     private ChatUiManager uiManager;
-
-    /** 当前会话编号（切历史会话时会变） */
     private String sessionId;
+    private ApiClient api;
+
+    private View drawer;
+    private View scrim;
+    private HistoryAdapter historyAdapter;
+    private EditText editHistorySearch;
+
+    /** 后端返回的全部会话（搜索时在本地过滤） */
+    private final List<SessionInfo> allSessions = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,36 +64,81 @@ public class MainActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
 
-        // 沉浸式布局：给根布局加上系统栏的边距，内容不被状态栏/导航栏挡住
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
 
-        // 会话编号：启动时生成一个随机串，整个对话过程复用（后端靠它记住上下文）
         sessionId = UUID.randomUUID().toString();
         uiManager = new ChatUiManager(this, sessionId);
+        api = new ApiClient(this);
 
-        // 按钮事件：转告给界面管理器处理
+        // 输入区
         findViewById(R.id.btn_send).setOnClickListener(v -> uiManager.onSendClicked());
         findViewById(R.id.btn_mic).setOnClickListener(v -> onMicClicked());
-
-        // 资料库：不经过 AI，直接按关键词翻资料原文
         findViewById(R.id.btn_browse).setOnClickListener(v ->
                 startActivity(new Intent(this, BrowseActivity.class)));
+        findViewById(R.id.btn_voice).setOnClickListener(v -> uiManager.toggleVoiceReply());
 
-        // 历史对话：从后端拉会话列表，点了就恢复
-        findViewById(R.id.btn_history).setOnClickListener(v -> showHistoryDialog());
+        // 顶栏
+        findViewById(R.id.btn_drawer).setOnClickListener(v -> openDrawer());
+        findViewById(R.id.btn_new_chat).setOnClickListener(v -> startNewSession());
+        findViewById(R.id.btn_settings).setOnClickListener(v -> uiManager.showServerDialog());
+
+        // 抽屉
+        drawer = findViewById(R.id.drawer);
+        scrim = findViewById(R.id.scrim);
+        scrim.setOnClickListener(v -> closeDrawer());
+
+        editHistorySearch = findViewById(R.id.edit_history_search);
+        editHistorySearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                renderHistory(s.toString().trim());
+            }
+        });
+
+        RecyclerView recycler = findViewById(R.id.recycler_history);
+        recycler.setLayoutManager(new LinearLayoutManager(this));
+        historyAdapter = new HistoryAdapter(info -> {
+            closeDrawer();
+            sessionId = info.sessionId;
+            uiManager.loadHistorySession(sessionId);
+        });
+        recycler.setAdapter(historyAdapter);
+
+        setupBackHandler();
     }
 
-    /** 历史对话弹窗：标题 + 会话列表 + 底部"新对话" */
-    private void showHistoryDialog() {
-        ApiClient api = new ApiClient(this);
-        api.listSessions(30, new ChatApi.SessionListCallback() {
+    // ================== 历史抽屉 ==================
+
+    private void openDrawer() {
+        drawer.setVisibility(View.VISIBLE);
+        scrim.setVisibility(View.VISIBLE);
+        loadSessions();
+    }
+
+    private void closeDrawer() {
+        drawer.setVisibility(View.GONE);
+        scrim.setVisibility(View.GONE);
+    }
+
+    private void loadSessions() {
+        api.listSessions(50, new ChatApi.SessionListCallback() {
             @Override
             public void onList(List<SessionInfo> sessions) {
-                showSessionList(sessions);
+                allSessions.clear();
+                allSessions.addAll(sessions);
+                renderHistory(editHistorySearch.getText().toString().trim());
             }
 
             @Override
@@ -97,42 +148,67 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void showSessionList(List<SessionInfo> sessions) {
-        final Dialog dialog = new Dialog(this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-
-        View view = getLayoutInflater().inflate(R.layout.dialog_history, null);
-        RecyclerView recycler = view.findViewById(R.id.recycler_history);
-        TextView empty = view.findViewById(R.id.text_history_empty);
-
-        recycler.setLayoutManager(new LinearLayoutManager(this));
-        HistoryAdapter adapter = new HistoryAdapter(info -> {
-            dialog.dismiss();
-            sessionId = info.sessionId;
-            uiManager.loadHistorySession(sessionId);
-        });
-        recycler.setAdapter(adapter);
-        adapter.submit(sessions);
-
-        boolean noData = sessions.isEmpty();
-        empty.setVisibility(noData ? View.VISIBLE : View.GONE);
-        recycler.setVisibility(noData ? View.GONE : View.VISIBLE);
-
-        view.findViewById(R.id.btn_new_session).setOnClickListener(v -> {
-            dialog.dismiss();
-            sessionId = UUID.randomUUID().toString();
-            uiManager.startNewSession(sessionId);
-        });
-
-        dialog.setContentView(view);
-        dialog.show();
-        // 圆角卡片要透明底，宽度占屏 92%
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.92f);
-            window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+    /** 按关键词过滤 + 按时间分组（今天 / 7 天内 / 30 天内 / 更早） */
+    private void renderHistory(String keyword) {
+        Map<String, List<SessionInfo>> groups = new LinkedHashMap<>();
+        String[] order = {
+                getString(R.string.history_group_today),
+                getString(R.string.history_group_week),
+                getString(R.string.history_group_month),
+                getString(R.string.history_group_older),
+        };
+        for (String key : order) {
+            groups.put(key, new ArrayList<>());
         }
+        for (SessionInfo info : allSessions) {
+            if (!keyword.isEmpty() && !info.title.contains(keyword)) {
+                continue;
+            }
+            groups.get(groupOf(info.updatedAt)).add(info);
+        }
+
+        List<Object> rows = new ArrayList<>();
+        for (String key : order) {
+            List<SessionInfo> list = groups.get(key);
+            if (list == null || list.isEmpty()) {
+                continue;
+            }
+            rows.add(key);
+            rows.addAll(list);
+        }
+        historyAdapter.submit(rows);
+    }
+
+    private String groupOf(String updatedAt) {
+        try {
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+            format.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            Date date = format.parse(updatedAt);
+            if (date == null) {
+                return getString(R.string.history_group_older);
+            }
+            long days = (System.currentTimeMillis() - date.getTime()) / 86400000L;
+            if (days <= 0) {
+                return getString(R.string.history_group_today);
+            }
+            if (days < 7) {
+                return getString(R.string.history_group_week);
+            }
+            if (days < 30) {
+                return getString(R.string.history_group_month);
+            }
+            return getString(R.string.history_group_older);
+        } catch (Exception e) {
+            return getString(R.string.history_group_older);
+        }
+    }
+
+    private void startNewSession() {
+        closeDrawer();
+        sessionId = UUID.randomUUID().toString();
+        uiManager.startNewSession(sessionId);
+        // 界面本来就是空的时候，清空看不出变化，给个明确反馈
+        Toast.makeText(this, R.string.toast_new_chat, Toast.LENGTH_SHORT).show();
     }
 
     /** 点麦克风按钮：有录音权限就直接录，没有就先申请 */
@@ -147,7 +223,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /** 权限申请的结果（用户点了弹窗之后系统回调到这里） */
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -155,14 +230,28 @@ public class MainActivity extends AppCompatActivity {
             boolean granted = grantResults.length > 0
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED;
             if (granted) {
-                uiManager.onMicClicked();   // 用户同意了，直接开始录音
+                uiManager.onMicClicked();
             } else {
                 uiManager.onAudioPermissionDenied();
             }
         }
     }
 
-    /** 页面销毁：释放录音和播放资源 */
+    /** 返回键：抽屉开着先关抽屉，否则交给系统 */
+    private void setupBackHandler() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (drawer.getVisibility() == View.VISIBLE) {
+                    closeDrawer();
+                    return;
+                }
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+            }
+        });
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();

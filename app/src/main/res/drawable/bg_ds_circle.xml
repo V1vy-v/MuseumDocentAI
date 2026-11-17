@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 圆形图标按钮（描边款，用于麦克风/设置） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="@color/ds_bg" />
+    <stroke android:width="1.5dp" android:color="@color/ds_text" />
+</shape>

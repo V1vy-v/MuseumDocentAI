@@ -29,4 +29,18 @@
     <string name="toast_play_failed">语音播放失败</string>
     <string name="err_network">网络连接失败，请检查网络</string>
     <string name="err_server">服务返回数据异常</string>
+
+    <!-- ====== 资料库（手动检索，不经过 AI） ====== -->
+    <string name="btn_browse">资料库</string>
+    <string name="browse_title">资料库</string>
+    <string name="browse_back">返回</string>
+    <string name="browse_hint">搜文物或博物馆，如「青铜剑」「故宫」</string>
+    <string name="browse_search">搜索</string>
+    <string name="browse_kind_all">全部</string>
+    <string name="browse_kind_museum">博物馆</string>
+    <string name="browse_kind_artifact">文物</string>
+    <string name="browse_loading">加载中…</string>
+    <string name="browse_empty">没有找到相关资料，换个关键词试试</string>
+    <string name="browse_count">共 %1$d 条</string>
+    <string name="browse_close">关闭</string>
 </resources>

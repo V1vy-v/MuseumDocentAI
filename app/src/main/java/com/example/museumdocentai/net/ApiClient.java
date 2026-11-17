@@ -6,6 +6,7 @@ import android.os.Looper;
 import android.util.Base64;
 
 import com.example.museumdocentai.R;
+import com.example.museumdocentai.model.KbItem;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -18,8 +19,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -184,6 +187,78 @@ public class ApiClient implements ChatApi {
         mainHandler.post(() -> callback.onFailure(message));
     }
 
+    // ======== 资料库：手动检索（不经过大模型，也不消耗 token） ========
+
+    @Override
+    public void searchKb(String query, String kind, int limit, KbListCallback callback) {
+        executor.execute(() -> {
+            String path = "/api/kb/search?limit=" + limit;
+            if (query != null && !query.trim().isEmpty()) {
+                path += "&q=" + encode(query.trim());
+            }
+            if (kind != null && !kind.isEmpty()) {
+                path += "&kind=" + encode(kind);
+            }
+            try {
+                JSONObject json = new JSONObject(getJson(path));
+                JSONArray array = json.optJSONArray("items");
+                List<KbItem> items = new ArrayList<>();
+                if (array != null) {
+                    for (int i = 0; i < array.length(); i++) {
+                        JSONObject one = array.optJSONObject(i);
+                        if (one != null) {
+                            items.add(KbItem.from(one));
+                        }
+                    }
+                }
+                final List<KbItem> result = items;
+                final int total = json.optInt("total", result.size());
+                mainHandler.post(() -> callback.onList(result, total));
+            } catch (IOException e) {
+                mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_network)));
+            } catch (JSONException e) {
+                mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_server)));
+            }
+        });
+    }
+
+    @Override
+    public void openKbDoc(String path, KbDocCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject json = new JSONObject(getJson("/api/kb/doc?path=" + encode(path)));
+                final String title = json.optString("title", "");
+                final String kind = json.optString("kind", "");
+                final String province = json.optString("province", "");
+                final String museum = json.optString("museum", "");
+                final String text = json.optString("text", "");
+
+                StringBuilder meta = new StringBuilder("artifact".equals(kind) ? "文物" : "博物馆");
+                if (!province.isEmpty()) {
+                    meta.append(" · ").append(province);
+                }
+                if ("artifact".equals(kind) && !museum.isEmpty()) {
+                    meta.append(" · ").append(museum);
+                }
+                final String metaLine = meta.toString();
+                mainHandler.post(() -> callback.onDoc(title, metaLine, text));
+            } catch (IOException e) {
+                mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_network)));
+            } catch (JSONException e) {
+                mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_server)));
+            }
+        });
+    }
+
+    /** 查询参数里的中文必须编码，否则 URL 直接报错 */
+    private static String encode(String value) {
+        try {
+            return URLEncoder.encode(value, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            return value;       // UTF-8 一定存在，这里只是编译器的形式要求
+        }
+    }
+
     // ======== 请求的发送细节 ========
     /** 打开一个到后端的连接（统一设置超时） */
     private HttpURLConnection openConnection(String baseUrl, String path) throws IOException {
@@ -222,6 +297,33 @@ public class ApiClient implements ChatApi {
             }
         }
         throw lastError;
+    }
+
+    /** 发送 GET 请求（资料库检索用），连不上会自动换下一个地址重试 */
+    private String getJson(String path) throws IOException {
+        IOException lastError = null;
+        for (String base : baseUrlsToTry()) {
+            try {
+                String result = getJsonOnce(base, path);
+                workingBaseUrl = base;
+                return result;
+            } catch (IOException e) {
+                lastError = e;
+            }
+        }
+        throw lastError;
+    }
+
+    private String getJsonOnce(String baseUrl, String path) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + path).openConnection();
+        connection.setRequestMethod("GET");
+        connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        connection.setReadTimeout(READ_TIMEOUT_MS);
+        try {
+            return readResponse(connection);
+        } finally {
+            connection.disconnect();
+        }
     }
 
     private String postJsonOnce(String baseUrl, String path, String jsonBody) throws IOException {

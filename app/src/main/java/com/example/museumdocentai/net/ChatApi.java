@@ -1,5 +1,7 @@
 package com.example.museumdocentai.net;
 
+import com.example.museumdocentai.model.KbItem;
+
 import java.io.File;
 import java.util.List;
 
@@ -58,6 +60,33 @@ public interface ChatApi {
 
     /** 把一段文字合成语音（朗读回答用） */
     void synthesize(String text, TtsCallback callback);
+
+    // ======== 资料库（手动检索，不经过大模型） ========
+
+    /** 资料检索的回调 */
+    interface KbListCallback {
+        void onList(List<KbItem> items, int total);
+
+        void onFailure(String message);
+    }
+
+    /** 打开一份资料原文的回调 */
+    interface KbDocCallback {
+        void onDoc(String title, String meta, String text);
+
+        void onFailure(String message);
+    }
+
+    /**
+     * 按关键词检索资料库。
+     *
+     * @param query 关键词；留空表示按类型列出（浏览模式）
+     * @param kind  "museum"/"artifact"；空串表示全部
+     */
+    void searchKb(String query, String kind, int limit, KbListCallback callback);
+
+    /** 取一份资料的原文（path 就是检索结果里的 path 字段） */
+    void openKbDoc(String path, KbDocCallback callback);
 
     /** 设置后端地址；传空字符串表示恢复"自动尝试内置候选地址" */
     void setServerUrl(String url);

@@ -1,6 +1,7 @@
 package com.example.museumdocentai;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 
@@ -53,6 +54,10 @@ public class MainActivity extends AppCompatActivity {
         // 按钮事件：转告给界面管理器处理
         findViewById(R.id.btn_send).setOnClickListener(v -> uiManager.onSendClicked());
         findViewById(R.id.btn_mic).setOnClickListener(v -> onMicClicked());
+
+        // 资料库：不经过 AI，直接按关键词翻资料原文
+        findViewById(R.id.btn_browse).setOnClickListener(v ->
+                startActivity(new Intent(this, BrowseActivity.class)));
     }
 
     /** 点麦克风按钮：有录音权限就直接录，没有就先申请 */

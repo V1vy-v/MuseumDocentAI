@@ -150,6 +150,9 @@ class RouteRegistrationTest(unittest.TestCase):
         "/api/sessions": {"get", "post"},
         "/api/sessions/{session_id}/messages": {"get"},
         "/api/sessions/{session_id}": {"delete"},
+        # 资料库手动检索（不经过大模型）：列表/搜索 + 原文
+        "/api/kb/search": {"get"},
+        "/api/kb/doc": {"get"},
     }
 
     def test_all_endpoints_registered_with_expected_methods(self):

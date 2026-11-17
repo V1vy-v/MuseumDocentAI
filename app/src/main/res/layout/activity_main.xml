@@ -46,6 +46,19 @@
             android:layout_height="wrap_content"
             android:checked="true" />
 
+        <!-- 资料库：不经过 AI，直接按关键词翻资料（检索链路不消耗 token） -->
+        <Button
+            android:id="@+id/btn_browse"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:text="@string/btn_browse"
+            android:textColor="@android:color/white"
+            android:textSize="12sp" />
+
         <!-- 服务器地址设置（真机测试时填电脑的局域网 IP） -->
         <Button
             android:id="@+id/btn_settings"

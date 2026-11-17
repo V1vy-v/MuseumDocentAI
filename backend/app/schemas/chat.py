@@ -12,6 +12,11 @@ class ChatRequest(BaseModel):
     """文本问答请求"""
     question: str          # 问题文本
     session_id: str        # 会话编号（多轮对话靠它找历史）
+    # 可选：强制指定检索方式，用于演示时对比两条路的效果。
+    #   ""/"auto" 默认（有向量索引就走向量，否则关键词）
+    #   "keyword" 只用关键词匹配   "vector" 只用向量检索
+    # 老前端不传这个字段，行为与以前完全一致。
+    retrieval: str = ""
 
 
 class ChatResponse(BaseModel):

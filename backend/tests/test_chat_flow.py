@@ -65,7 +65,7 @@ class ChatFlowTest(FlowTestCase):
         """核心回归：检索必须拿到消解后的问句，而不是带代词的原文"""
         seen = []
 
-        def fake_retrieve(question):
+        def fake_retrieve(question, mode=""):
             seen.append(question)
             return [SOURCE]
 
@@ -82,7 +82,7 @@ class ChatFlowTest(FlowTestCase):
         """消解有猜错的可能：改写后搜不到时，退回原句再试一次"""
         seen = []
 
-        def fake_retrieve(question):
+        def fake_retrieve(question, mode=""):
             seen.append(question)
             return [] if question == EXPECTED_QUERY else [SOURCE]
 
@@ -126,7 +126,7 @@ class ChatFlowTest(FlowTestCase):
         """三连问的完整链路：第 3 轮"这个"也应被消解（焦点来自上一轮 sources）"""
         seen = []
 
-        def fake_retrieve(question):
+        def fake_retrieve(question, mode=""):
             seen.append(question)
             return [SOURCE]
 
@@ -143,7 +143,7 @@ class ChatFlowTest(FlowTestCase):
     def test_without_pronoun_retrieval_uses_original(self):
         seen = []
 
-        def fake_retrieve(question):
+        def fake_retrieve(question, mode=""):
             seen.append(question)
             return [SOURCE]
 
@@ -192,7 +192,7 @@ class VoiceFlowTest(FlowTestCase):
     def test_voice_retrieval_uses_resolved_question(self):
         seen = []
 
-        def fake_retrieve(question):
+        def fake_retrieve(question, mode=""):
             seen.append(question)
             return [SOURCE]
 

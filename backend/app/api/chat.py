@@ -45,10 +45,11 @@ def _prepare(req: ChatRequest) -> tuple:
 
     # 3. 检索。消解有猜错的可能，所以先用改写后的问句检索，
     #    没命中再退回原句兜一次（两路都试，成本只是多一次本地关键词匹配）
+    #    retrieval 字段让调试台可以强制指定"关键词/向量"，用于演示时的 A/B 对比。
     query = resolved if info["changed"] else req.question
-    sources = rag.retrieve(query)
+    sources = rag.retrieve(query, mode=req.retrieval)
     if not sources and query != req.question:
-        sources = rag.retrieve(req.question)
+        sources = rag.retrieve(req.question, mode=req.retrieval)
 
     return ctx, resolved, sources, [s["title"] for s in sources], rag.catalog()
 

@@ -69,20 +69,35 @@ def _retrieve_keyword(question: str) -> list:
     return results[: config.TOP_K]
 
 
-def retrieve(question: str) -> list:
+def retrieve(question: str, mode: str = "") -> list:
     """检索与问题相关的资料片段。
 
     返回的 title 是【文档级标题】（不是块编号）：
     它要进 ChatResponse.sources 给前端显示，也要给下一轮指代消解当焦点，
     所以同一篇文档的多个块命中后只保留最高分的那一个。
+
+    mode 用于"A/B 对比"（课程演示要对比关键词与向量两条路的效果）：
+      ""/"auto"  默认：有向量索引就走向量，出问题降级关键词
+      "keyword"  强制关键词匹配（不调向量、不消耗 embedding 额度）
+      "vector"   强制向量检索；索引没就绪时返回空，便于暴露问题而不是偷偷降级
     """
     if not (question or "").strip():
         return []
 
+    mode = (mode or "").strip().lower()
+
+    if mode == "keyword":
+        return _retrieve_keyword(question)
+
+    if mode == "vector":
+        if not vector_store.available():
+            return []
+        return vector_store.search(question, topk=config.TOP_K)
+
     if vector_store.available():
         try:
             hits = vector_store.search(question, topk=config.TOP_K)
-            # 命中就返回；没命中就返回空（代表"馆内确实没有"），不退回关键词
+            # 命中就返回；没命中就返回空（代表"资料库确实没有"），不退回关键词
             return hits
         except Exception as exc:        # noqa: BLE001 —— 向量路出问题必须能兜住
             print("[rag] 向量检索失败，退回关键词模式：", type(exc).__name__, exc)

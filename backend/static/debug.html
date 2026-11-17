@@ -181,6 +181,12 @@
           <label class="chk" title="回答生成完后自动朗读（调用 POST /api/tts）">
             <input type="checkbox" id="chk-speak"> 自动朗读
           </label>
+          <!-- 检索方式：演示时需要对比"关键词 vs 向量"两条路的效果 -->
+          <select id="sel-retrieval" title="检索方式：自动=有向量索引就用向量；关键词=不调 embedding，用于 A/B 对比">
+            <option value="">自动</option>
+            <option value="vector">向量</option>
+            <option value="keyword">关键词</option>
+          </select>
           <span class="hint" id="sending-hint"></span>
         </div>
       </div>
@@ -249,6 +255,12 @@
 
 const $ = (id) => document.getElementById(id);
 const LS_KEY = "museum_debug_session_id";
+
+// 检索方式：""=自动、 "vector"=强制向量、 "keyword"=强制关键词（演示时做 A/B 对比）
+function retrievalMode() {
+  const el = $("sel-retrieval");
+  return el ? el.value : "";
+}
 
 let sessionId = localStorage.getItem(LS_KEY) || "";
 let state = null;          // 最近一次 /messages 的响应
@@ -491,7 +503,7 @@ async function send(text) {
       addResolvedNote(userBubble, info.resolved, question);
       answerText = info.answer;
     } else {
-      const body = { question: question, session_id: sessionId };
+      const body = { question: question, session_id: sessionId, retrieval: retrievalMode() };
       const data = await api("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -544,7 +556,7 @@ async function streamAnswer(question, bubbleWrap) {
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify({ question: question, session_id: sessionId }),
+    body: JSON.stringify({ question: question, session_id: sessionId, retrieval: retrievalMode() }),
   });
   if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
 

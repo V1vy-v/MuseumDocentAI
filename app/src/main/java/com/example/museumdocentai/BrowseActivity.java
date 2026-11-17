@@ -137,16 +137,20 @@ public class BrowseActivity extends AppCompatActivity {
 
         findViewById(R.id.btn_kind_all).setOnClickListener(v -> {
             kind = "";
+            updateKindButtons();
             doSearch();
         });
         findViewById(R.id.btn_kind_museum).setOnClickListener(v -> {
             kind = "museum";
+            updateKindButtons();
             doSearch();
         });
         findViewById(R.id.btn_kind_artifact).setOnClickListener(v -> {
             kind = "artifact";
+            updateKindButtons();
             doSearch();
         });
+        updateKindButtons();
 
         spinnerProvince.setOnItemSelectedListener(new SimpleSelectListener() {
             @Override
@@ -295,11 +299,12 @@ public class BrowseActivity extends AppCompatActivity {
             TextView chip = new TextView(this);
             chip.setText(word);
             chip.setTextSize(12);
-            chip.setPadding(24, 8, 24, 8);
-            chip.setBackgroundColor(0xFFEEEBF5);
+            chip.setBackgroundResource(R.drawable.bg_pill);
+            chip.setTextColor(getColor(R.color.brand_dark));
+            chip.setPadding(28, 8, 28, 8);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, 0, 12, 0);
+            lp.setMargins(0, 4, 8, 4);
             chip.setLayoutParams(lp);
             chip.setOnClickListener(v -> {
                 editSearch.setText(word);
@@ -308,6 +313,21 @@ public class BrowseActivity extends AppCompatActivity {
             });
             layoutHistory.addView(chip);
         }
+    }
+
+    /** 类型按钮的选中态：选中的用实心胶囊，其余用浅色胶囊 */
+    private void updateKindButtons() {
+        styleKindButton(findViewById(R.id.btn_kind_all), kind.isEmpty());
+        styleKindButton(findViewById(R.id.btn_kind_museum), "museum".equals(kind));
+        styleKindButton(findViewById(R.id.btn_kind_artifact), "artifact".equals(kind));
+    }
+
+    private void styleKindButton(android.widget.Button button, boolean selected) {
+        if (button == null) {
+            return;
+        }
+        button.setBackgroundResource(selected ? R.drawable.bg_pill_selected : R.drawable.bg_pill);
+        button.setTextColor(getColor(selected ? R.color.text_on_brand : R.color.brand_dark));
     }
 
     private List<String> loadHistory() {

@@ -1,98 +1,102 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 主界面：顶部标题栏 + 中间对话列表 + 状态提示行 + 底部输入区 -->
+<!-- 主界面：渐变顶栏 + 对话列表（空态引导卡片）+ 状态行 + 圆角输入栏 -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/bg_app"
     tools:context=".MainActivity">
 
-    <!-- 顶部标题栏：应用名 + 语音播报开关 + 服务器设置 -->
+    <!-- 顶部标题栏 -->
     <LinearLayout
         android:id="@+id/layout_title"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:background="?attr/colorPrimary"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_toolbar"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="4dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="6dp"
         app:layout_constraintTop_toTopOf="parent">
 
-        <TextView
-            android:id="@+id/text_title"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/app_name"
-            android:textColor="@android:color/white"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/text_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/app_title"
+                android:textColor="@color/text_on_brand"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:alpha="0.8"
+                android:text="@string/app_subtitle"
+                android:textColor="@color/text_on_brand"
+                android:textSize="11sp" />
+        </LinearLayout>
 
         <!-- 语音播报开关：关掉后只显示文字，不朗读也不播放 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:alpha="0.9"
             android:text="@string/voice_reply_label"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
+            android:textColor="@color/text_on_brand"
+            android:textSize="11sp" />
 
         <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/switch_voice"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:checked="true" />
+            android:layout_marginEnd="2dp"
+            android:checked="true"
+            android:scaleX="0.8"
+            android:scaleY="0.8" />
 
         <!-- 历史对话：切换/恢复之前的会话 -->
         <Button
             android:id="@+id/btn_history"
-            style="?android:attr/borderlessButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:text="@string/btn_history"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
+            style="@style/ToolbarIconButton"
+            android:text="@string/icon_history"
+            tools:ignore="SpeakableTextPresentCheck" />
 
-        <!-- 资料库：不经过 AI，直接按关键词翻资料（检索链路不消耗 token） -->
+        <!-- 资料库：不经过 AI，直接按关键词翻资料 -->
         <Button
             android:id="@+id/btn_browse"
-            style="?android:attr/borderlessButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:text="@string/btn_browse"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
+            style="@style/ToolbarIconButton"
+            android:text="@string/icon_browse"
+            tools:ignore="SpeakableTextPresentCheck" />
 
         <!-- 服务器地址设置（真机测试时填电脑的局域网 IP） -->
         <Button
             android:id="@+id/btn_settings"
-            style="?android:attr/borderlessButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:text="@string/btn_settings"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
+            style="@style/ToolbarIconButton"
+            android:text="@string/icon_settings"
+            tools:ignore="SpeakableTextPresentCheck" />
     </LinearLayout>
 
-    <!-- 中间：对话消息列表（气泡一条条排下来） -->
+    <!-- 中间：对话消息列表 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_messages"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:clipToPadding="false"
-        android:padding="8dp"
+        android:paddingStart="8dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="4dp"
         app:layout_constraintBottom_toTopOf="@id/layout_status"
         app:layout_constraintTop_toBottomOf="@id/layout_title" />
 
@@ -101,9 +105,15 @@
         android:id="@+id/layout_empty"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:background="@drawable/bg_card"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="20dp"
+        android:paddingStart="20dp"
+        android:paddingTop="24dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="20dp"
         app:layout_constraintBottom_toTopOf="@id/layout_status"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -112,53 +122,56 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingBottom="4dp"
+            android:text="@string/empty_icon"
+            android:textSize="30sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
             android:text="@string/empty_title"
-            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:textSize="17sp"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingBottom="14dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="16dp"
             android:text="@string/empty_hint"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
         <Button
             android:id="@+id/btn_suggest_1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            style="@style/PillButton"
             android:layout_marginBottom="8dp"
-            android:text="@string/suggest_1"
-            android:textSize="13sp" />
+            android:text="@string/suggest_1" />
 
         <Button
             android:id="@+id/btn_suggest_2"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            style="@style/PillButton"
             android:layout_marginBottom="8dp"
-            android:text="@string/suggest_2"
-            android:textSize="13sp" />
+            android:text="@string/suggest_2" />
 
         <Button
             android:id="@+id/btn_suggest_3"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/suggest_3"
-            android:textSize="13sp" />
+            style="@style/PillButton"
+            android:text="@string/suggest_3" />
     </LinearLayout>
 
-    <!-- 状态提示行：等待回答时转圈+“思考中…”，录音时只显示文字 -->
+    <!-- 状态提示行：等待回答时转圈+"思考中…"，录音时只显示文字 -->
     <LinearLayout
         android:id="@+id/layout_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingLeft="12dp"
-        android:paddingTop="4dp"
-        android:paddingRight="12dp"
-        android:paddingBottom="4dp"
+        android:paddingLeft="16dp"
+        android:paddingTop="2dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="2dp"
         app:layout_constraintBottom_toTopOf="@id/layout_input">
 
         <ProgressBar
@@ -175,44 +188,68 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="@string/status_thinking"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp"
             android:visibility="gone"
             tools:visibility="visible" />
     </LinearLayout>
 
-    <!-- 底部输入区：文本输入框 + 发送按钮 + 语音按钮 -->
+    <!-- 底部输入区：圆角输入框 + 圆形发送/语音按钮 -->
     <LinearLayout
         android:id="@+id/layout_input"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_input"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="8dp"
+        android:paddingStart="14dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="4dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <EditText
             android:id="@+id/edit_question"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="44dp"
             android:layout_weight="1"
+            android:background="@null"
             android:hint="@string/hint_question"
             android:importantForAutofill="no"
             android:inputType="text"
-            android:maxLines="1" />
-
-        <Button
-            android:id="@+id/btn_send"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:text="@string/btn_send" />
+            android:maxLines="1"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"
+            android:textSize="15sp" />
 
         <Button
             android:id="@+id/btn_mic"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:text="@string/btn_record" />
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_mic"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            android:text="@string/btn_record"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/btn_send"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_send"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            android:text="@string/btn_send"
+            android:textColor="@color/text_on_brand"
+            android:textSize="16sp" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

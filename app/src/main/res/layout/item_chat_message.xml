@@ -1,33 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 对话列表里的单条消息：一个气泡 + 下方的资料来源小字（AI 回答才有） -->
+<!-- 对话列表里的单条消息：头像 + 气泡 + 来源小胶囊 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/layout_bubble_item"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:paddingTop="4dp"
-    android:paddingBottom="4dp">
+    android:gravity="start"
+    android:orientation="horizontal"
+    android:paddingStart="4dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="4dp"
+    android:paddingBottom="6dp">
 
-    <!-- 气泡文字（用户靠右深色、AI 靠左浅色，在代码里设置） -->
+    <!-- AI 头像（用户消息隐藏） -->
     <TextView
-        android:id="@+id/text_bubble"
+        android:id="@+id/avatar"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/bg_avatar_ai"
+        android:gravity="center"
+        android:text="@string/avatar_ai"
+        android:textColor="@color/brand_dark"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        tools:ignore="RtlSymmetry" />
+
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:maxWidth="280dp"
-        android:padding="12dp"
-        android:textSize="15sp"
-        tools:text="你好，我是博物馆讲解员" />
+        android:orientation="vertical">
 
-    <!-- 资料来源小字（默认隐藏，AI 回答带来源时显示） -->
-    <TextView
-        android:id="@+id/text_sources"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textSize="11sp"
-        android:visibility="gone"
-        tools:text="来源：青铜器图录"
-        tools:visibility="visible" />
+        <!-- 气泡文字（用户深色靠右、AI 白色卡片靠左，代码里切背景） -->
+        <TextView
+            android:id="@+id/text_bubble"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bubble_ai"
+            android:lineSpacingExtra="4dp"
+            android:maxWidth="300dp"
+            android:paddingStart="14dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="10dp"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            tools:text="你好，我是博物馆讲解助手" />
+
+        <!-- 资料来源（默认隐藏，AI 回答带来源时显示） -->
+        <TextView
+            android:id="@+id/text_sources"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_source"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
+            android:textColor="@color/brand_dark"
+            android:textSize="11sp"
+            android:visibility="gone"
+            tools:text="来源：越王勾践剑、湖北省博物馆"
+            tools:visibility="visible" />
+
+    </LinearLayout>
 
 </LinearLayout>

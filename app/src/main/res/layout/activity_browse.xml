@@ -4,14 +4,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/browse_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/bg_app">
 
     <!-- 顶部栏：返回 + 标题 -->
     <LinearLayout
         android:id="@+id/browse_title_bar"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:background="?attr/colorPrimary"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_toolbar"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="4dp"
@@ -20,24 +21,26 @@
 
         <Button
             android:id="@+id/btn_back"
-            style="?android:attr/borderlessButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:text="@string/browse_back"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
+            style="@style/ToolbarIconButton"
+            android:text="@string/browse_back" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
             android:layout_weight="1"
             android:text="@string/browse_title"
-            android:textColor="@android:color/white"
-            android:textSize="17sp"
+            android:textColor="@color/text_on_brand"
+            android:textSize="18sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:alpha="0.85"
+            android:text="@string/browse_subtitle"
+            android:textColor="@color/text_on_brand"
+            android:textSize="11sp" />
     </LinearLayout>
 
     <!-- 搜索区 -->
@@ -60,22 +63,30 @@
             <EditText
                 android:id="@+id/edit_search"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="44dp"
                 android:layout_weight="1"
+                android:background="@drawable/bg_input"
                 android:hint="@string/browse_hint"
                 android:imeOptions="actionSearch"
                 android:inputType="text"
                 android:maxLines="1"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
                 android:textSize="15sp" />
 
             <Button
                 android:id="@+id/btn_search"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_pill_selected"
                 android:minWidth="0dp"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
                 android:text="@string/browse_search"
+                android:textColor="@color/text_on_brand"
                 android:textSize="13sp" />
         </LinearLayout>
 
@@ -88,39 +99,20 @@
 
             <Button
                 android:id="@+id/btn_kind_all"
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:paddingStart="6dp"
-                android:paddingEnd="6dp"
-                android:text="@string/browse_kind_all"
-                android:textColor="#6750A4"
-                android:textSize="13sp" />
+                style="@style/PillButton"
+                android:layout_marginEnd="6dp"
+                android:text="@string/browse_kind_all" />
 
             <Button
                 android:id="@+id/btn_kind_museum"
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:paddingStart="6dp"
-                android:paddingEnd="6dp"
-                android:text="@string/browse_kind_museum"
-                android:textColor="#6750A4"
-                android:textSize="13sp" />
+                style="@style/PillButton"
+                android:layout_marginEnd="6dp"
+                android:text="@string/browse_kind_museum" />
 
             <Button
                 android:id="@+id/btn_kind_artifact"
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:paddingStart="6dp"
-                android:paddingEnd="6dp"
-                android:text="@string/browse_kind_artifact"
-                android:textColor="#6750A4"
-                android:textSize="13sp" />
+                style="@style/PillButton"
+                android:text="@string/browse_kind_artifact" />
 
             <TextView
                 android:id="@+id/text_count"

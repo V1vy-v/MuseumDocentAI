@@ -1,25 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 资料原文弹窗：可滚动，展示原始 Markdown 文本（不渲染格式，保持朴素） -->
+<!-- 资料原文弹窗：圆角卡片，正文可滚动、可选中复制 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:paddingStart="20dp"
+    android:paddingTop="18dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="8dp">
 
     <TextView
         android:id="@+id/text_dialog_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:textColor="@color/text_primary"
         android:textSize="17sp"
         android:textStyle="bold" />
 
     <TextView
         android:id="@+id/text_dialog_meta"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_source"
+        android:paddingStart="6dp"
         android:paddingTop="2dp"
-        android:paddingBottom="8dp"
-        android:textSize="12sp" />
+        android:paddingEnd="6dp"
+        android:paddingBottom="2dp"
+        android:textColor="@color/brand_dark"
+        android:textSize="11sp" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -30,7 +40,8 @@
             android:id="@+id/text_dialog_body"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:lineSpacingExtra="4dp"
+            android:lineSpacingExtra="5dp"
+            android:textColor="@color/text_primary"
             android:textIsSelectable="true"
             android:textSize="14sp" />
     </ScrollView>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 全局配色：深紫 + 暖白，走"博物馆导览"的安静气质 -->
+<resources>
+    <!-- 品牌色 -->
+    <color name="brand">#5B4B8A</color>
+    <color name="brand_dark">#47396E</color>
+    <color name="brand_light">#EFEAF9</color>
+    <color name="brand_accent">#B79CE0</color>
+
+    <!-- 背景与描边 -->
+    <color name="bg_app">#F7F5FB</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="stroke">#E7E2F1</color>
+
+    <!-- 文字 -->
+    <color name="text_primary">#1D1B20</color>
+    <color name="text_secondary">#6E6A78</color>
+    <color name="text_on_brand">#FFFFFF</color>
+    <color name="error">#B3261E</color>
+</resources>

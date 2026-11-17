@@ -91,6 +91,18 @@ ARK_API_KEY = os.environ.get("ARK_API_KEY", "")
 ARK_TEXT_MODEL = os.environ.get("ARK_TEXT_MODEL", "doubao-seed-2.1-lite")
 ARK_EMBED_MODEL = os.environ.get("ARK_EMBED_MODEL", "doubao-embedding-vision")
 
+# —— 向量化（独立配置，允许和文本模型不同家）——
+# 不填 EMBED_* 就回落到上面的 Ark，所以老配置完全不受影响。
+# 为什么单独拆出来：ARK_API_KEY/ARK_BASE_URL 同时是文本模型的备用通道
+# （llm_client._text_target），把它们改指向别家会让备用通道悄悄失效。
+#
+# 实测（2026-11，本机，616 份资料 ≈ 3400 块）：
+#   doubao-embedding-vision   2048 维，批量上限 10，约 2.1s/批，会 429
+#   BAAI/bge-m3 (SiliconFlow) 1024 维，批量 512 仍可用，约 0.3s/批，未撞限频
+EMBED_BASE_URL = os.environ.get("EMBED_BASE_URL", "").strip() or ARK_BASE_URL
+EMBED_API_KEY = os.environ.get("EMBED_API_KEY", "").strip() or ARK_API_KEY
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "").strip() or ARK_EMBED_MODEL
+
 # doubao 默认会烧思考 token（实测一个寒暄烧了 469 个 reasoning token，
 # completion 里 89% 是思考）。讲解场景延迟敏感，默认关掉；
 # 万一平台不认这个参数，把开关置 0 即可，不影响其他调用。
@@ -107,8 +119,9 @@ TOP_K = 3
 # 索引目录见下方 VECTOR_DIR（要等 DATA_DIR 定义好）
 COLLECTION_NAME = "museum_kb"
 EMBED_DIM = _int_env("EMBED_DIM", 2048)          # 首次建库会用真实返回值校准
-EMBED_BATCH = _int_env("EMBED_BATCH", 10)        # 一次请求塞多少段（平台硬上限就是 10）
-# 平台有频率限制：大批量建库时按 0.4s/批会被 429 打断，批间留一点间隔最省事。
+EMBED_BATCH = _int_env("EMBED_BATCH", 100)       # 一次请求塞多少段
+# 上限取决于供应商：火山 Ark 实测硬上限 10，SiliconFlow bge-m3 实测 512 仍可用。
+# 平台有频率限制：Ark 按 0.4s/批会被 429 打断，批间留一点间隔最省事。
 # 只影响首次建库/大幅增量，日常问答不受影响。
 EMBED_DELAY_SECONDS = _float_env("EMBED_DELAY_SECONDS", 0.35)
 EMBED_RETRIES = _int_env("EMBED_RETRIES", 6)     # 429/5xx 时的最大重试次数（指数退避）

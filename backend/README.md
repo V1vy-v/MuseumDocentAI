@@ -20,14 +20,16 @@ uvicorn app.main:app --port 8000     # 开发时可以加 --reload
 
 **向量索引会自动构建，不需要任何手工命令**：启动时按 `knowledge_base/` 的资料
 切块 + 向量化，写进 `backend/data/zvec_kb/`（已 gitignore，可随时删掉重建）。
-第一次约 1.5 秒，之后只重建改过的文件。日志会告诉你走的是哪条路：
+当前 616 份资料约 5726 块，首次建库约 **55 秒**，之后只重建改过的文件（秒级）。
+日志会告诉你走的是哪条路：
 
 ```
-[向量库] 就绪 dim=2048 文件=1 本次变更=1 新增块=1
+[向量化] 5726/5726 段  已用 49.7s
+[向量库] 就绪 dim=1024 文件=616 本次变更=616 新增块=5726
 [启动] 文本模型 deepseek-flash @ https://api.deepseek.com
 ```
 
-如果看到 `[向量库] 未配置 ARK_API_KEY → 检索退回关键词模式`，就是 key 没配好。
+如果看到 `[向量库] 未配置 EMBED_API_KEY / ARK_API_KEY → 检索退回关键词模式`，就是 key 没配好。
 
 > ⚠️ 只能单进程跑（别用 `--workers 2`）。向量库是进程内数据库，一个索引目录只能被一个进程打开。
 
@@ -83,6 +85,32 @@ uvicorn app.main:app --reload --port 8000
 | `RAG_VECTOR_ENABLED` | 1 | 置 `0` 完全关闭向量检索（不建索引、不调 embedding），直接用关键词模式 |
 | `VECTOR_DIR` | `backend/data/zvec_kb` | 索引目录位置 |
 
+**向量化可以换供应商**（都走 OpenAI 兼容的 `/embeddings`）。下面三个不填就回落到
+`ARK_*`，所以只配了火山的人不用改任何东西：
+
+| 环境变量 | 默认 | 作用 |
+|---|---|---|
+| `EMBED_BASE_URL` | 同 `ARK_BASE_URL` | 向量化接口地址 |
+| `EMBED_API_KEY` | 同 `ARK_API_KEY` | 向量化密钥 |
+| `EMBED_MODEL` | 同 `ARK_EMBED_MODEL` | 向量化模型名 |
+| `EMBED_BATCH` | 100 | 一次请求塞多少段。**火山 Ark 实测硬上限 10**，用 Ark 时必须设回 10 |
+| `EMBED_DELAY_SECONDS` | 0.35 | 批间间隔，仅建库时生效 |
+
+> 为什么不直接改 `ARK_*`：`ARK_BASE_URL` / `ARK_API_KEY` 同时是**文本模型的备用通道**
+> （DeepSeek 不可用时切火山，见 `llm_client._text_target`）。把它们指向别家会让
+> 这条备用通道带着不匹配的模型名去调用，等于悄悄失效。
+
+实测对比（616 份资料 / 5726 块，2026-11 本机）：
+
+| 供应商 | 维度 | 批量 | 单批耗时 | 建库总耗时 | 限频 |
+|---|---|---|---|---|---|
+| 火山 `doubao-embedding-vision` | 2048 | 10（硬上限） | ~2.1s | 约 20 分钟 | 大批量必现 429 |
+| SiliconFlow `BAAI/bge-m3` | 1024 | 100 | ~0.86s | **54.9 秒** | 未遇到 |
+
+换模型会改变向量维度，`vector_store` 检测到维度变化后**自动重建索引**
+（`_reset_disk`），不需要手工删目录。检索效果上 Ark 略优（19 条描述式查询的
+MRR 0.961 vs 0.912），bge-m3 的已知弱项是"用风格描述指代某幅具体画作"这类问法。
+
 值写错（比如填了非数字）会退回默认值，不会把服务带崩。
 
 ## 目录说明
@@ -96,7 +124,7 @@ uvicorn app.main:app --reload --port 8000
 | `app/services/rag.py` | C | 检索门面：选路、融合、防幻觉、给出来源与原文链接 |
 | `app/services/vector_store.py` | C | zvec 向量库：建库、增量同步、向量距离闸门 + BM25 混合检索 |
 | `app/services/chunker.py` | C | 把资料按 Markdown 结构切成检索单元 |
-| `app/services/embeddings.py` | C | 文本向量化（火山 Ark doubao-embedding-vision） |
+| `app/services/embeddings.py` | C | 文本向量化（OpenAI 兼容，供应商可换：默认火山 Ark，当前用 SiliconFlow bge-m3） |
 | `app/services/guard.py` | D | 本馆信息类问题识别：没资料时直接回固定话术，不给模型编造的机会 |
 | `app/services/store.py` | D | 对话持久化仓储层（SQLite）：建表、读写、TTL 清理 |
 | `app/services/memory.py` | D | 多轮对话记忆：历史保存、上下文窗口、最近摘要 |

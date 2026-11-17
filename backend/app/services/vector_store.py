@@ -116,7 +116,7 @@ def _open_or_create(dim: int):
         col = zvec.open(path=str(config.VECTOR_DIR))
     else:
         col = zvec.create_and_open(path=str(config.VECTOR_DIR), schema=_schema(dim))
-    _save_json(_dim_path(), {"dim": dim, "model": config.ARK_EMBED_MODEL})
+    _save_json(_dim_path(), {"dim": dim, "model": config.EMBED_MODEL})
     return col
 
 
@@ -253,7 +253,7 @@ def ensure_ready(force: bool = False) -> bool:
             print("[向量库] " + _last_error + " → 检索退回关键词模式")
             return False
         if not embeddings.available():
-            _last_error = "未配置 ARK_API_KEY"
+            _last_error = "未配置 EMBED_API_KEY / ARK_API_KEY"
             print("[向量库] " + _last_error + " → 检索退回关键词模式")
             return False
 

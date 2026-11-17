@@ -63,6 +63,12 @@ public class ChatUiManager {
     /** 语音提问的占位气泡：拿到后端识别文本后替换成真正的问题内容 */
     private ChatMessage voiceBubble;
 
+    /** 待播放的语音片段（后端按句推过来，按顺序播） */
+    private final java.util.List<byte[]> audioQueue = new java.util.ArrayList<>();
+
+    /** 当前是否有片段正在播放 */
+    private boolean audioPlaying = false;
+
     /** 本地设置：记住"语音播报"开关的状态 */
     private static final String PREFS_NAME = "docent_prefs";
     private static final String KEY_VOICE_REPLY = "voice_reply";
@@ -149,10 +155,51 @@ public class ChatUiManager {
     public void toggleVoiceReply() {
         boolean next = !isVoiceReplyEnabled();
         setVoiceReplyEnabled(next);
-        if (!next && player.isPlaying()) {
-            player.stop();          // 关掉开关时立刻停止正在播放的语音
+        if (!next) {
+            clearAudioQueue();      // 关掉开关时立刻停止播放并清空还没播的句子
         }
         refreshVoicePill();
+    }
+
+    // ================== 按句播放（后端边生成边推） ==================
+
+    /** 收到一句合成好的语音：入队，没在播就立刻播 */
+    private void enqueueAudio(byte[] audio) {
+        if (audio == null || audio.length == 0 || !isVoiceReplyEnabled()) {
+            return;
+        }
+        audioQueue.add(audio);
+        playNextAudio();
+    }
+
+    /** 播完一句接着播下一句；队列空就停下 */
+    private void playNextAudio() {
+        if (audioPlaying || audioQueue.isEmpty() || !isVoiceReplyEnabled()) {
+            return;
+        }
+        byte[] next = audioQueue.remove(0);
+        audioPlaying = true;
+        player.play(next, new AudioPlayer.Listener() {
+            @Override
+            public void onPlaybackFinished() {
+                audioPlaying = false;
+                playNextAudio();
+            }
+
+            @Override
+            public void onPlaybackFailed(String message) {
+                audioPlaying = false;
+                playNextAudio();       // 一句失败不影响后面的句子
+            }
+        });
+    }
+
+    private void clearAudioQueue() {
+        audioQueue.clear();
+        audioPlaying = false;
+        if (player.isPlaying()) {
+            player.stop();
+        }
     }
 
     /** 胶囊文案跟着开关状态变：🔊 / 🔇 */
@@ -227,7 +274,12 @@ public class ChatUiManager {
         showThinking();
 
         final StringBuilder buffer = new StringBuilder();
-        apiClient.streamText(question, sessionId, new ChatApi.StreamCallback() {
+        final boolean wantAudio = isVoiceReplyEnabled();
+        // 打开播报时才请求后端"边生成边合成"；关掉就只拿文字，省一次合成开销
+        apiClient.streamText(question, sessionId, wantAudio, new ChatApi.StreamCallback() {
+            /** 本轮是否收到过后端推来的语音（有的话 onDone 里就不用再整段合成） */
+            private boolean gotAudio = false;
+
             @Override
             public void onMeta(List<String> sources) {
                 if (sources != null && !sources.isEmpty()) {
@@ -250,6 +302,13 @@ public class ChatUiManager {
             }
 
             @Override
+            public void onAudio(byte[] audio) {
+                // 后端每合成好一句就推一句，这里立刻排队播放——不用等整段回答
+                gotAudio = true;
+                enqueueAudio(audio);
+            }
+
+            @Override
             public void onDone(String answer) {
                 String finalText = (answer == null || answer.isEmpty())
                         ? buffer.toString() : answer;
@@ -258,8 +317,8 @@ public class ChatUiManager {
                 refreshMessage(pending);
                 scrollToBottom();
                 hideStatus();
-                // 语音播报：和以前一样，开关关掉就只显示文字
-                if (isVoiceReplyEnabled() && !finalText.isEmpty()) {
+                // 开关关掉就只显示文字；后端没推语音（比如 TTS 不可用）时退回整段合成
+                if (wantAudio && !gotAudio && !finalText.isEmpty()) {
                     speak(finalText);
                 }
             }

@@ -128,6 +128,12 @@ public interface ChatApi {
         /** 收到一段新增文字（要求在主线程调用） */
         void onDelta(String text);
 
+        /**
+         * 收到一句已经合成好的语音（with_audio=true 时才有）。
+         * 后端按句合成、边生成边推，客户端收到就可以立刻播，不用等整段回答。
+         */
+        void onAudio(byte[] audio);
+
         /** 生成完成，answer 是完整回答 */
         void onDone(String answer);
 
@@ -148,7 +154,12 @@ public interface ChatApi {
         void onFailure(String message);
     }
 
-    void streamText(String question, String sessionId, StreamCallback callback);
+    /**
+     * 流式问答：后端边生成边推（SSE）。
+     *
+     * @param withAudio true 时请求后端"边生成边按句合成"，语音会提前很多（实测约提前 2.8 秒）
+     */
+    void streamText(String question, String sessionId, boolean withAudio, StreamCallback callback);
 
     void listSessions(int limit, SessionListCallback callback);
 

@@ -336,12 +336,15 @@ public class ApiClient implements ChatApi {
     // ======== 流式问答 + 会话历史 ========
 
     @Override
-    public void streamText(String question, String sessionId, StreamCallback callback) {
+    public void streamText(String question, String sessionId, boolean withAudio,
+                           StreamCallback callback) {
         executor.execute(() -> {
             JSONObject body = new JSONObject();
             try {
                 body.put("question", question);
                 body.put("session_id", sessionId);
+                // 让后端边生成边按句合成语音，语音能提前好几秒出来
+                body.put("with_audio", withAudio);
             } catch (JSONException e) {
                 mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_server)));
                 return;
@@ -356,8 +359,7 @@ public class ApiClient implements ChatApi {
                     lastError = e;
                 }
             }
-            String message = lastError == null ? context.getString(R.string.err_network)
-                    : context.getString(R.string.err_network);
+            String message = context.getString(R.string.err_network);
             mainHandler.post(() -> callback.onFailure(message));
         });
     }
@@ -416,6 +418,19 @@ public class ApiClient implements ChatApi {
                 case "delta": {
                     String text = json.optString("text", "");
                     mainHandler.post(() -> callback.onDelta(text));
+                    break;
+                }
+                case "audio": {
+                    // 一句已经合成好的语音，收到就能播（不用等整段回答）
+                    String base64 = json.optString("audio_base64", "");
+                    if (!base64.isEmpty()) {
+                        byte[] audio = Base64.decode(base64, Base64.DEFAULT);
+                        mainHandler.post(() -> callback.onAudio(audio));
+                    }
+                    break;
+                }
+                case "audio_done": {
+                    // 语音推完；错误信息不影响文字回答，界面不额外处理
                     break;
                 }
                 case "done": {

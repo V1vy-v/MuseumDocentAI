@@ -103,7 +103,12 @@ def _pack(paragraphs: list) -> list:
 
 
 def split_text(text: str) -> list:
-    """Markdown 正文 → chunk 列表（chunk_no 从 1 开始，同一次调用内连续）"""
+    """Markdown 正文 → chunk 列表（chunk_no 从 1 开始，同一次调用内连续）
+
+    注意：块内容会带上所在小节标题（形如「故宫博物院 › 展厅分布与参观路线 › 参观信息」）。
+    不带的话，"故宫开放时间"这类问题会命中卡片开头那段介绍，
+    而真正写着开放时间的"参观信息"小节因为没有关键词上下文而排不上来。
+    """
     if not text or not text.strip():
         return []
 
@@ -111,7 +116,8 @@ def split_text(text: str) -> list:
     for heading, lines in _split_sections(text):
         body = _body_lines("\n".join(lines))
         for chunk in _pack(body):
-            out.append({"heading": heading, "chunk_no": len(out) + 1, "content": chunk})
+            content = f"{heading}\n{chunk}" if heading else chunk
+            out.append({"heading": heading, "chunk_no": len(out) + 1, "content": content})
     return out
 
 

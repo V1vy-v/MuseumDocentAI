@@ -95,9 +95,13 @@ def _sse(name: str, payload: dict) -> str:
     return f"event: {name}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
-def _audio_sse(index: int, data: bytes) -> str:
-    """一句音频的 SSE 事件（WAV 字节转 base64）。"""
-    return _sse("audio", {"index": index, "format": "wav",
+def _audio_sse(index: int, text: str, data: bytes) -> str:
+    """一句音频的 SSE 事件（WAV 字节转 base64）。
+
+    带上这一句的文字：客户端可以"听到哪句就显示哪句"，
+    避免文字早早刷完、语音在后面追的观感。
+    """
+    return _sse("audio", {"index": index, "text": text, "format": "wav",
                           "audio_base64": base64.b64encode(data).decode()})
 
 

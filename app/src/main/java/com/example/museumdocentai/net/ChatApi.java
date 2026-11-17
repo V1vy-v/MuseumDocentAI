@@ -130,9 +130,12 @@ public interface ChatApi {
 
         /**
          * 收到一句已经合成好的语音（with_audio=true 时才有）。
-         * 后端按句合成、边生成边推，客户端收到就可以立刻播，不用等整段回答。
+         *
+         * @param sentence 这一句对应的文字：界面用它"听到哪句显示哪句"，
+         *                 文字就不会跑到语音前面去
+         * @param audio    这一句的 WAV 音频
          */
-        void onAudio(byte[] audio);
+        void onAudio(String sentence, byte[] audio);
 
         /** 生成完成，answer 是完整回答 */
         void onDone(String answer);

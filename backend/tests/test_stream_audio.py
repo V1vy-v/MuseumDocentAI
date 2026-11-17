@@ -154,7 +154,8 @@ class SentenceSpeakerTest(unittest.TestCase):
             sp.flush()
             sp.close()
             items = _drain(sp)
-        self.assertEqual([i for i, _ in items], [0, 1])
+        # poll 现在返回 (index, 句子文字, WAV字节)
+        self.assertEqual([item[0] for item in items], [0, 1])
         self.assertEqual(len(rec.texts), 2)
 
     def test_short_fragments_are_merged(self):

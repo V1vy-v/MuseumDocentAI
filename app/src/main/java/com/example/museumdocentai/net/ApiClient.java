@@ -421,11 +421,13 @@ public class ApiClient implements ChatApi {
                     break;
                 }
                 case "audio": {
-                    // 一句已经合成好的语音，收到就能播（不用等整段回答）
+                    // 一句已经合成好的语音：连同这一句的文字一起交给界面，
+                    // 界面显示文字 + 播放音频，两边同步
                     String base64 = json.optString("audio_base64", "");
+                    String sentence = json.optString("text", "");
                     if (!base64.isEmpty()) {
                         byte[] audio = Base64.decode(base64, Base64.DEFAULT);
-                        mainHandler.post(() -> callback.onAudio(audio));
+                        mainHandler.post(() -> callback.onAudio(sentence, audio));
                     }
                     break;
                 }

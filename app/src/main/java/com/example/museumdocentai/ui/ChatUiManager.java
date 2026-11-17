@@ -69,6 +69,9 @@ public class ChatUiManager {
     /** 当前是否有片段正在播放 */
     private boolean audioPlaying = false;
 
+    /** 第几轮问答：新问题一提交就自增，旧的流靠它能判断"自己过期了" */
+    private int streamSeq = 0;
+
     /** 本地设置：记住"语音播报"开关的状态 */
     private static final String PREFS_NAME = "docent_prefs";
     private static final String KEY_VOICE_REPLY = "voice_reply";
@@ -162,6 +165,17 @@ public class ChatUiManager {
     }
 
     // ================== 按句播放（后端边生成边推） ==================
+
+    /**
+     * 新问题打断上一轮：停掉正在播的语音、清空排队、让旧的流回调失效。
+     *
+     * 规则是"新问题优先"：观众既然问下一个问题了，上一轮没播完的语音直接丢掉，
+     * 不排队——否则新回答要等旧语音念完才出声，体验更差。
+     */
+    private void interruptPreviousTurn() {
+        streamSeq++;
+        clearAudioQueue();
+    }
 
     /** 收到一句合成好的语音：入队，没在播就立刻播 */
     private void enqueueAudio(byte[] audio) {
@@ -266,6 +280,7 @@ public class ChatUiManager {
      * 文本提问则可以先把字铺出来，首字延迟从 1~3 秒降到 0.3 秒左右。
      */
     private void askBackendStreaming(String question) {
+        interruptPreviousTurn();
         final ChatMessage pending = new ChatMessage(
                 ChatMessage.Role.AI, "", null, ChatMessage.Status.LOADING);
         adapter.add(pending);
@@ -274,7 +289,10 @@ public class ChatUiManager {
         showThinking();
 
         final StringBuilder buffer = new StringBuilder();
+        final StringBuilder shown = new StringBuilder();   // 界面上已经显示出来的文字
         final boolean wantAudio = isVoiceReplyEnabled();
+        // 新问题会打断上一轮的语音：旧流的回调靠这个序号识别"自己已经过期了"
+        final int mySeq = ++streamSeq;
         // 打开播报时才请求后端"边生成边合成"；关掉就只拿文字，省一次合成开销
         apiClient.streamText(question, sessionId, wantAudio, new ChatApi.StreamCallback() {
             /** 本轮是否收到过后端推来的语音（有的话 onDone 里就不用再整段合成） */
@@ -293,8 +311,14 @@ public class ChatUiManager {
                 if (text == null || text.isEmpty()) {
                     return;
                 }
-                hideStatus();      // 已经开始出字了，"思考中"就撤掉
+
                 buffer.append(text);
+                if (wantAudio) {
+                    // 开播报时先不显示：等这一句的语音合好，跟着语音一起显示，
+                    // 文字就不会跑到声音前头（详见 onAudio）。
+                    // 注意这里不撤"思考中"，等第一句音频到了再撤，否则界面会空着。
+                    return;
+                }
                 pending.setText(buffer.toString());
                 pending.setStatus(ChatMessage.Status.DONE);
                 refreshMessage(pending);
@@ -302,9 +326,20 @@ public class ChatUiManager {
             }
 
             @Override
-            public void onAudio(byte[] audio) {
-                // 后端每合成好一句就推一句，这里立刻排队播放——不用等整段回答
+            public void onAudio(String sentence, byte[] audio) {
+                if (mySeq != streamSeq) {
+                    return;         // 这轮已经被新问题顶掉了，别再插播旧语音
+                }
                 gotAudio = true;
+                hideStatus();       // 第一句语音到了，才真正"出声/出字"，这时撤掉思考中
+                // 收到哪句就显示哪句，然后立刻播——文字与语音同步
+                if (sentence != null && !sentence.isEmpty()) {
+                    shown.append(sentence);
+                    pending.setText(shown.toString());
+                    pending.setStatus(ChatMessage.Status.DONE);
+                    refreshMessage(pending);
+                    scrollToBottom();
+                }
                 enqueueAudio(audio);
             }
 
@@ -312,7 +347,15 @@ public class ChatUiManager {
             public void onDone(String answer) {
                 String finalText = (answer == null || answer.isEmpty())
                         ? buffer.toString() : answer;
-                pending.setText(finalText);
+                // 补上还没显示的部分：TTS 不可用、或超出合成上限时，文字不能漏
+                if (wantAudio && finalText.length() > shown.length()) {
+                    shown.setLength(0);
+                    shown.append(finalText);
+                    pending.setText(finalText);
+                    refreshMessage(pending);
+                } else if (!wantAudio) {
+                    pending.setText(finalText);
+                }
                 pending.setStatus(ChatMessage.Status.DONE);
                 refreshMessage(pending);
                 scrollToBottom();
@@ -398,6 +441,7 @@ public class ChatUiManager {
      * question 不为空 → 文本提问；voiceFile 不为空 → 语音提问。
      */
     private void askBackend(String question, File voiceFile) {
+        interruptPreviousTurn();
         final ChatMessage pending = new ChatMessage(
                 ChatMessage.Role.AI, "", null, ChatMessage.Status.LOADING);
         adapter.add(pending);
@@ -459,11 +503,13 @@ public class ChatUiManager {
 
     /** 把一段回答文字合成语音并播放（文字提问时用；失败只提示，不影响看文字答案） */
     private void speak(String text) {
+        final int mySeq = streamSeq;        // 合成期间用户可能已经问了新问题
         apiClient.synthesize(text, new ChatApi.TtsCallback() {
             @Override
             public void onAudio(byte[] audio) {
-                // 合成期间用户可能把开关关掉了，再确认一次
-                if (audio != null && audio.length > 0 && isVoiceReplyEnabled()) {
+                // 合成期间用户可能把开关关掉了、或者已经问了新问题，都别再播
+                if (audio != null && audio.length > 0
+                        && isVoiceReplyEnabled() && mySeq == streamSeq) {
                     player.play(audio, playbackListener);
                 }
             }

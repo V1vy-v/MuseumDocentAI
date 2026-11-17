@@ -227,6 +227,8 @@ class SentenceSpeaker:
                     self._error = f"{type(exc).__name__}: {exc}"
                     return
                 with self._lock:
-                    self._out.append((idx, data))
+                    # 连文字一起交出去：客户端拿它把"这一句"显示出来，
+                    # 文字和语音就同步了（谁先出都不会错位）。
+                    self._out.append((idx, text, data))
         finally:
             self._finished.set()

@@ -240,30 +240,37 @@ def _resolve_image(root: Path, base: Path, ref: str):
     return None
 
 
-def _to_plain(text: str) -> str:
-    """把 Markdown 转成给普通用户看的纯文本：标题加【】、去掉符号与内部字段。"""
+def _to_plain(text: str, title: str = "") -> str:
+    """把 Markdown 转成给普通用户看的纯文本。
+
+    规则：标题加【】、去掉列表符号和加粗、丢掉内部编号与"馆藏："前缀、
+    去掉与弹窗标题重复的第一行。
+    """
     lines = []
     for raw in text.splitlines():
-        line = raw.rstrip()
-        stripped = line.strip()
-        if not stripped:
+        s = raw.strip()
+        if not s:
             lines.append("")
             continue
-        if stripped.startswith("!["):
+        if s.startswith("!["):
             continue                                  # 图片单独走 images 字段
-        if "资料馆编号" in stripped or stripped.startswith("馆藏："):
-            continue                                  # 内部编号/馆藏前缀不展示
-        if stripped.startswith("### "):
-            lines.append(stripped[4:].strip())
-        elif stripped.startswith("## "):
-            lines.append("【" + stripped[3:].strip() + "】")
-        elif stripped.startswith("# "):
-            lines.append(stripped[2:].strip())
-        elif stripped.startswith("> "):
-            lines.append(stripped[2:].strip())
-        else:
-            # 列表项里的 **加粗** 去掉，保留“字段：值”
-            lines.append(stripped.replace("**", ""))
+        if s.startswith("# "):
+            heading = s[2:].strip()
+            if heading and heading != title:          # 标题已在弹窗顶部，不重复
+                lines.append(heading)
+            continue
+        if s.startswith("## "):
+            lines.append("【" + s[3:].strip() + "】")
+            continue
+        if s.startswith("### "):
+            lines.append(s[4:].strip())
+            continue
+        s = s.lstrip(">").strip()
+        s = re.sub(r"^[-*·]\s*", "", s)
+        s = s.replace("**", "")
+        if "编号" in s or s.startswith("馆藏"):
+            continue                                  # 内部编号、馆藏前缀不展示
+        lines.append(s)
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip() + "\n"
 
 
@@ -289,7 +296,7 @@ def kb_doc(path: str = Query(..., description="相对 knowledge_base 的路径")
                 images.append(resolved.relative_to(root).as_posix())
 
     return {"title": target.stem, "path": rel.as_posix(),
-            "text": _to_plain(raw), "images": images, **meta}
+            "text": _to_plain(raw, target.stem), "images": images, **meta}
 
 
 @router.get("/api/kb/image", include_in_schema=False)

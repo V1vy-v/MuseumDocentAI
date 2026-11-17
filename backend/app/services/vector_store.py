@@ -424,6 +424,15 @@ def search(question: str, topk: int = None) -> list:
                 if any(word in heading for word in intent_headings):
                     fused[doc_id] += boost
 
+        # 4.6) 实体优先：题目里点到的那件文物/那座馆，它的资料应该排第一。
+        #      实测：问《金杖》年代时，博物馆卡（里面也写了这件文物的年代）
+        #      经常排在文物卡前面，导致"首条命中"率偏低。点名了就让它优先。
+        if mentioned:
+            top_bonus = 2.0 / (config.RRF_RANK_CONSTANT + 1)
+            for doc_id in fused:
+                if (candidates[doc_id]["fields"].get("doc_title") or "") in mentioned:
+                    fused[doc_id] += top_bonus
+
         ranked = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)
 
         # 5) 同一篇文档只保留得分最高的那段，避免一篇资料占满 3 个名额

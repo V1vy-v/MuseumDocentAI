@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>检索评测 · 30 题</title>
+<style>
+  body { margin:0; background:#F7F8FA; color:#1A1A1A;
+         font:15px/1.55 "PingFang SC","Microsoft YaHei",system-ui,sans-serif; }
+  .wrap { max-width:820px; margin:0 auto; padding:18px 14px 40px; }
+  h1 { font-size:19px; margin:6px 0 2px; }
+  .sub { color:#8A8A8E; font-size:12px; margin-bottom:14px; }
+  .grid { display:flex; gap:10px; flex-wrap:wrap; }
+  .card { background:#fff; border:1px solid #E8E8ED; border-radius:12px;
+           padding:10px 12px; flex:1; min-width:150px; }
+  .card .k { font-size:12px; color:#8A8A8E; }
+  .card .v { font-size:22px; font-weight:700; }
+  .kw { color:#C0392B; } .vec { color:#2E7D32; }
+  table { width:100%; border-collapse:collapse; background:#fff;
+           border:1px solid #E8E8ED; border-radius:12px; overflow:hidden;
+           font-size:13px; margin-top:12px; }
+  th, td { padding:8px 10px; border-bottom:1px solid #F0F0F3; text-align:left; }
+  th { background:#FAFAFC; color:#8A8A8E; font-weight:600; font-size:12px; }
+  .idx { color:#B0B0B6; width:26px; }
+  .q { font-weight:600; font-size:13px; }
+  .cmp { margin-top:4px; display:flex; flex-direction:column; gap:2px; font-size:12px; }
+</style></head>
+<body><div class="wrap">
+  <h1>检索评测：关键词 vs 向量</h1>
+  <div class="sub">30 题自动取样（20 文物 + 6 馆级信息 + 4 无关）· 585 份资料 / 4394 块</div>
+
+  <div class="grid">
+    <div class="card"><div class="k">关键词·首条命中</div>
+      <div class="v kw">53%</div>
+      <div class="k">16/30</div></div>
+    <div class="card"><div class="k">向量·首条命中</div>
+      <div class="v vec">97%</div>
+      <div class="k">29/30</div></div>
+    <div class="card"><div class="k">任一命中（前 3 条）</div>
+      <div class="v">73% / 97%</div>
+      <div class="k">关键词 / 向量</div></div>
+    <div class="card"><div class="k">平均耗时</div>
+      <div class="v">2.17s / 1.82s</div>
+      <div class="k">关键词 / 向量</div></div>
+  </div>
+
+  <table>
+    <tr><th>题型</th><th>题数</th><th>关键词首条命中</th><th>向量首条命中</th></tr>
+    <tr><td>文物·年代</td><td>10</td><td class='kw'>3/10</td><td class='vec'>9/10</td></tr><tr><td>文物·类别</td><td>10</td><td class='kw'>6/10</td><td class='vec'>10/10</td></tr><tr><td>馆级信息</td><td>6</td><td class='kw'>5/6</td><td class='vec'>6/6</td></tr><tr><td>无关/闲聊</td><td>4</td><td class='kw'>2/4</td><td class='vec'>4/4</td></tr>
+  </table>
+
+  <table>
+    <tr><th>#</th><th>题目与首条来源对比</th></tr>
+    
+    <tr>
+      <td class="idx">1</td>
+      <td>
+        <div class="q">《金杖》是什么年代的文物？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：文化和旅游部恭王府博物馆</span>
+        <span class="vec">✓ 向量：金杖</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">2</td>
+      <td>
+        <div class="q">《毁灭》属于什么类别？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：故宫博物院</span>
+        <span class="vec">✓ 向量：毁灭</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">3</td>
+      <td>
+        <div class="q">《水晶》是什么年代的文物？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：（无）</span>
+        <span class="vec">✓ 向量：水晶</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">4</td>
+      <td>
+        <div class="q">《关于建国以来党的若干历史问题的决议》属于什么类别？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：（无）</span>
+        <span class="vec">✓ 向量：关于建国以来党的若干历史问题的决议</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">5</td>
+      <td>
+        <div class="q">《仿文嘉山水图轴》是什么年代的文物？</div>
+        <div class="cmp"><span class="kw">✓ 关键词：仿文嘉山水图轴</span>
+        <span class="vec">✓ 向量：仿文嘉山水图轴</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">6</td>
+      <td>
+        <div class="q">《京城永屹》属于什么类别？</div>
+        <div class="cmp"><span class="kw">✓ 关键词：京城永屹</span>
+        <span class="vec">✓ 向量：京城永屹</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">7</td>
+      <td>
+        <div class="q">《民国时期中央银行发行的法币伍佰元》是什么年代的文物？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：四渡赤水纪念馆</span>
+        <span class="vec">✗ 向量：（无）</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">8</td>
+      <td>
+        <div class="q">《铸客大鼎》属于什么类别？</div>
+        <div class="cmp"><span class="kw">✓ 关键词：铸客大鼎</span>
+        <span class="vec">✓ 向量：铸客大鼎</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">9</td>
+      <td>
+        <div class="q">《广州旧家居》是什么年代的文物？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：（无）</span>
+        <span class="vec">✓ 向量：广州旧家居</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">10</td>
+      <td>
+        <div class="q">《金缕玉衣》属于什么类别？</div>
+        <div class="cmp"><span class="kw">✓ 关键词：金缕玉衣</span>
+        <span class="vec">✓ 向量：金缕玉衣</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">11</td>
+      <td>
+        <div class="q">《张择端清明上河图卷》是什么年代的文物？</div>
+        <div class="cmp"><span class="kw">✓ 关键词：张择端清明上河图卷</span>
+        <span class="vec">✓ 向量：张择端清明上河图卷</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">12</td>
+      <td>
+        <div class="q">《1938年美术家冯文志在武汉创作的抗日布旗》属于什么类别？</div>
+        <div class="cmp"><span class="kw">✓ 关键词：1938年美术家冯文志在武汉创作的抗日布旗</span>
+        <span class="vec">✓ 向量：1938年美术家冯文志在武汉创作的抗日布旗</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">13</td>
+      <td>
+        <div class="q">《云纹铜禁》是什么年代的文物？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：（无）</span>
+        <span class="vec">✓ 向量：云纹铜禁</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">14</td>
+      <td>
+        <div class="q">《颜真卿楷书西亭记残碑》属于什么类别？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：浙江大学艺术与考古博物馆</span>
+        <span class="vec">✓ 向量：颜真卿楷书西亭记残碑</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">15</td>
+      <td>
+        <div class="q">《釉里红龙纹油锤瓶》是什么年代的文物？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：清华大学艺术博物馆</span>
+        <span class="vec">✓ 向量：釉里红龙纹油锤瓶</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">16</td>
+      <td>
+        <div class="q">《素纱襌衣》属于什么类别？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：湖南省博物馆</span>
+        <span class="vec">✓ 向量：素纱襌衣</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">17</td>
+      <td>
+        <div class="q">《秦代玉高足杯》是什么年代的文物？</div>
+        <div class="cmp"><span class="kw">✓ 关键词：秦代玉高足杯</span>
+        <span class="vec">✓ 向量：秦代玉高足杯</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">18</td>
+      <td>
+        <div class="q">《兽面纹铜方鼎》属于什么类别？</div>
+        <div class="cmp"><span class="kw">✓ 关键词：兽面纹铜方鼎</span>
+        <span class="vec">✓ 向量：兽面纹铜方鼎</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">19</td>
+      <td>
+        <div class="q">《卷云纹玉璜》是什么年代的文物？</div>
+        <div class="cmp"><span class="kw">✗ 关键词：重庆中国三峡博物馆（重庆博物馆）</span>
+        <span class="vec">✓ 向量：卷云纹玉璜</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">20</td>
+      <td>
+        <div class="q">《青铜凤纹尊》属于什么类别？</div>
+        <div class="cmp"><span class="kw">✓ 关键词：青铜凤纹尊</span>
+        <span class="vec">✓ 向量：青铜凤纹尊</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">21</td>
+      <td>
+        <div class="q">上海中国航海博物馆的开放时间是几点</div>
+        <div class="cmp"><span class="kw">✓ 关键词：上海中国航海博物馆</span>
+        <span class="vec">✓ 向量：上海中国航海博物馆</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">22</td>
+      <td>
+        <div class="q">上海博物馆的开放时间是几点</div>
+        <div class="cmp"><span class="kw">✗ 关键词：上海中国航海博物馆</span>
+        <span class="vec">✓ 向量：上海博物馆</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">23</td>
+      <td>
+        <div class="q">上海大学博物馆的开放时间是几点</div>
+        <div class="cmp"><span class="kw">✓ 关键词：上海大学博物馆</span>
+        <span class="vec">✓ 向量：上海大学博物馆</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">24</td>
+      <td>
+        <div class="q">上海市历史博物馆（上海革命历史博物馆）的开放时间是几点</div>
+        <div class="cmp"><span class="kw">✓ 关键词：上海市历史博物馆（上海革命历史博物馆）</span>
+        <span class="vec">✓ 向量：上海市历史博物馆（上海革命历史博物馆）</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">25</td>
+      <td>
+        <div class="q">上海市奉贤区博物馆的开放时间是几点</div>
+        <div class="cmp"><span class="kw">✓ 关键词：上海市奉贤区博物馆</span>
+        <span class="vec">✓ 向量：上海市奉贤区博物馆</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">26</td>
+      <td>
+        <div class="q">上海市龙华烈士纪念馆的开放时间是几点</div>
+        <div class="cmp"><span class="kw">✓ 关键词：上海市龙华烈士纪念馆</span>
+        <span class="vec">✓ 向量：上海市龙华烈士纪念馆</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">27</td>
+      <td>
+        <div class="q">附近有什么好吃的</div>
+        <div class="cmp"><span class="kw">✓ 关键词：（无）</span>
+        <span class="vec">✓ 向量：（无）</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">28</td>
+      <td>
+        <div class="q">今天天气怎么样</div>
+        <div class="cmp"><span class="kw">✗ 关键词：晚清最大私家收藏恭亲王府珍宝散佚记</span>
+        <span class="vec">✓ 向量：（无）</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">29</td>
+      <td>
+        <div class="q">帮我写一首关于春天的诗</div>
+        <div class="cmp"><span class="kw">✗ 关键词：淮北市博物馆</span>
+        <span class="vec">✓ 向量：（无）</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="idx">30</td>
+      <td>
+        <div class="q">推荐一部最近好看的电影</div>
+        <div class="cmp"><span class="kw">✓ 关键词：（无）</span>
+        <span class="vec">✓ 向量：（无）</span></div>
+      </td>
+    </tr>
+  </table>
+</div></body></html>

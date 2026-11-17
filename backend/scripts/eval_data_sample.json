@@ -1,0 +1,633 @@
+[
+ {
+  "kind": "文物·年代",
+  "q": "《金杖》是什么年代的文物？",
+  "expect": [
+   "金杖"
+  ],
+  "kw_sources": [
+   "文化和旅游部恭王府博物馆",
+   "晚清最大私家收藏恭亲王府珍宝散佚记",
+   "山西博物院"
+  ],
+  "kw_top": false,
+  "kw_any": false,
+  "kw_time": 4.42,
+  "vec_sources": [
+   "金杖",
+   "三星堆博物馆",
+   "南京博物院"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.95
+ },
+ {
+  "kind": "文物·类别",
+  "q": "《毁灭》属于什么类别？",
+  "expect": [
+   "毁灭"
+  ],
+  "kw_sources": [
+   "故宫博物院",
+   "悼丁君",
+   "故事新编"
+  ],
+  "kw_top": false,
+  "kw_any": false,
+  "kw_time": 1.26,
+  "vec_sources": [
+   "毁灭"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 2.09
+ },
+ {
+  "kind": "文物·年代",
+  "q": "《水晶》是什么年代的文物？",
+  "expect": [
+   "水晶"
+  ],
+  "kw_sources": [],
+  "kw_top": false,
+  "kw_any": false,
+  "kw_time": 5.53,
+  "vec_sources": [
+   "水晶",
+   "中国地质博物馆",
+   "水晶王"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.63
+ },
+ {
+  "kind": "文物·类别",
+  "q": "《关于建国以来党的若干历史问题的决议》属于什么类别？",
+  "expect": [
+   "关于建国以来党的若干历史问题的决议"
+  ],
+  "kw_sources": [],
+  "kw_top": false,
+  "kw_any": false,
+  "kw_time": 5.52,
+  "vec_sources": [
+   "关于建国以来党的若干历史问题的决议",
+   "于都中央红军长征集结出发历史博物馆",
+   "中国共产党历史"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.67
+ },
+ {
+  "kind": "文物·年代",
+  "q": "《仿文嘉山水图轴》是什么年代的文物？",
+  "expect": [
+   "仿文嘉山水图轴"
+  ],
+  "kw_sources": [
+   "仿文嘉山水图轴",
+   "八大山人纪念馆",
+   "文化和旅游部恭王府博物馆"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 2.46,
+  "vec_sources": [
+   "仿文嘉山水图轴",
+   "八大山人纪念馆",
+   "墨荷图轴"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.27
+ },
+ {
+  "kind": "文物·类别",
+  "q": "《京城永屹》属于什么类别？",
+  "expect": [
+   "京城永屹"
+  ],
+  "kw_sources": [
+   "京城永屹",
+   "南京城墙博物馆",
+   "晚清最大私家收藏恭亲王府珍宝散佚记"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.42,
+  "vec_sources": [
+   "京城永屹",
+   "南京城墙博物馆"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.58
+ },
+ {
+  "kind": "文物·年代",
+  "q": "《民国时期中央银行发行的法币伍佰元》是什么年代的文物？",
+  "expect": [
+   "民国时期中央银行发行的法币伍佰元"
+  ],
+  "kw_sources": [
+   "四渡赤水纪念馆",
+   "民国时期中央银行发行的法币伍佰元",
+   "民国时期中央银行发行的关金卷五千元"
+  ],
+  "kw_top": false,
+  "kw_any": true,
+  "kw_time": 1.45,
+  "vec_sources": [],
+  "vec_top": false,
+  "vec_any": false,
+  "vec_time": 5.56
+ },
+ {
+  "kind": "文物·类别",
+  "q": "《铸客大鼎》属于什么类别？",
+  "expect": [
+   "铸客大鼎"
+  ],
+  "kw_sources": [
+   "铸客大鼎",
+   "安徽博物院（安徽省文物鉴定站）",
+   "故宫博物院"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.08,
+  "vec_sources": [
+   "铸客大鼎",
+   "安徽博物院（安徽省文物鉴定站）",
+   "上海博物馆"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.48
+ },
+ {
+  "kind": "文物·年代",
+  "q": "《广州旧家居》是什么年代的文物？",
+  "expect": [
+   "广州旧家居"
+  ],
+  "kw_sources": [],
+  "kw_top": false,
+  "kw_any": false,
+  "kw_time": 5.51,
+  "vec_sources": [
+   "广州旧家居",
+   "广东民间工艺博物馆",
+   "岭南民间百艺"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.51
+ },
+ {
+  "kind": "文物·类别",
+  "q": "《金缕玉衣》属于什么类别？",
+  "expect": [
+   "金缕玉衣"
+  ],
+  "kw_sources": [
+   "金缕玉衣",
+   "金缕玉衣",
+   "徐州博物馆"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.6,
+  "vec_sources": [
+   "金缕玉衣",
+   "河北博物院",
+   "徐州博物馆"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 4.41
+ },
+ {
+  "kind": "文物·年代",
+  "q": "《张择端清明上河图卷》是什么年代的文物？",
+  "expect": [
+   "张择端清明上河图卷"
+  ],
+  "kw_sources": [
+   "张择端清明上河图卷",
+   "故宫博物院",
+   "开封市博物馆"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.65,
+  "vec_sources": [
+   "张择端清明上河图卷",
+   "故宫博物院",
+   "山西博物院"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 2.18
+ },
+ {
+  "kind": "文物·类别",
+  "q": "《1938年美术家冯文志在武汉创作的抗日布旗》属于什么类别？",
+  "expect": [
+   "1938年美术家冯文志在武汉创作的抗日布旗"
+  ],
+  "kw_sources": [
+   "1938年美术家冯文志在武汉创作的抗日布旗",
+   "武汉革命博物馆",
+   "北京鲁迅博物馆（北京新文化运动纪念馆）"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.19,
+  "vec_sources": [
+   "1938年美术家冯文志在武汉创作的抗日布旗",
+   "武汉革命博物馆"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.49
+ },
+ {
+  "kind": "文物·年代",
+  "q": "《云纹铜禁》是什么年代的文物？",
+  "expect": [
+   "云纹铜禁"
+  ],
+  "kw_sources": [],
+  "kw_top": false,
+  "kw_any": false,
+  "kw_time": 5.52,
+  "vec_sources": [
+   "云纹铜禁",
+   "福建博物院",
+   "铜斝"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.53
+ },
+ {
+  "kind": "文物·类别",
+  "q": "《颜真卿楷书西亭记残碑》属于什么类别？",
+  "expect": [
+   "颜真卿楷书西亭记残碑"
+  ],
+  "kw_sources": [
+   "浙江大学艺术与考古博物馆",
+   "颜真卿楷书西亭记残碑",
+   "故宫博物院"
+  ],
+  "kw_top": false,
+  "kw_any": true,
+  "kw_time": 1.12,
+  "vec_sources": [
+   "颜真卿楷书西亭记残碑",
+   "浙江大学艺术与考古博物馆",
+   "古诗四帖"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.44
+ },
+ {
+  "kind": "文物·年代",
+  "q": "《釉里红龙纹油锤瓶》是什么年代的文物？",
+  "expect": [
+   "釉里红龙纹油锤瓶"
+  ],
+  "kw_sources": [
+   "清华大学艺术博物馆",
+   "釉里红龙纹油锤瓶",
+   "南昌汉代海昏侯国遗址博物馆"
+  ],
+  "kw_top": false,
+  "kw_any": true,
+  "kw_time": 1.13,
+  "vec_sources": [
+   "釉里红龙纹油锤瓶",
+   "清华大学艺术博物馆",
+   "扬州博物馆"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.37
+ },
+ {
+  "kind": "文物·类别",
+  "q": "《素纱襌衣》属于什么类别？",
+  "expect": [
+   "素纱襌衣"
+  ],
+  "kw_sources": [
+   "湖南省博物馆",
+   "素纱襌衣",
+   "故宫博物院"
+  ],
+  "kw_top": false,
+  "kw_any": true,
+  "kw_time": 4.24,
+  "vec_sources": [
+   "素纱襌衣",
+   "湖南省博物馆"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.31
+ },
+ {
+  "kind": "文物·年代",
+  "q": "《秦代玉高足杯》是什么年代的文物？",
+  "expect": [
+   "秦代玉高足杯"
+  ],
+  "kw_sources": [
+   "秦代玉高足杯",
+   "西安博物院",
+   "文化和旅游部恭王府博物馆"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.15,
+  "vec_sources": [
+   "秦代玉高足杯",
+   "西安博物院",
+   "山东博物馆（山东省石刻艺术博物馆）"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.49
+ },
+ {
+  "kind": "文物·类别",
+  "q": "《兽面纹铜方鼎》属于什么类别？",
+  "expect": [
+   "兽面纹铜方鼎"
+  ],
+  "kw_sources": [
+   "兽面纹铜方鼎",
+   "郑州博物馆",
+   "中国国家博物馆"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.42,
+  "vec_sources": [
+   "兽面纹铜方鼎",
+   "郑州博物馆",
+   "良渚博物院"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.55
+ },
+ {
+  "kind": "文物·年代",
+  "q": "《卷云纹玉璜》是什么年代的文物？",
+  "expect": [
+   "卷云纹玉璜"
+  ],
+  "kw_sources": [
+   "重庆中国三峡博物馆（重庆博物馆）",
+   "卷云纹玉璜",
+   "文化和旅游部恭王府博物馆"
+  ],
+  "kw_top": false,
+  "kw_any": true,
+  "kw_time": 1.42,
+  "vec_sources": [
+   "卷云纹玉璜",
+   "重庆中国三峡博物馆（重庆博物馆）",
+   "南宋朱漆戗金莲瓣式人物花卉纹奁"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.78
+ },
+ {
+  "kind": "文物·类别",
+  "q": "《青铜凤纹尊》属于什么类别？",
+  "expect": [
+   "青铜凤纹尊"
+  ],
+  "kw_sources": [
+   "青铜凤纹尊",
+   "镇江博物馆",
+   "故宫博物院"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.15,
+  "vec_sources": [
+   "青铜凤纹尊",
+   "镇江博物馆",
+   "山西博物院"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.18
+ },
+ {
+  "kind": "馆级信息",
+  "q": "上海中国航海博物馆的开放时间是几点",
+  "expect": [
+   "上海中国航海博物馆"
+  ],
+  "kw_sources": [
+   "上海中国航海博物馆",
+   "上海博物馆",
+   "上海鲁迅纪念馆"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.25,
+  "vec_sources": [
+   "上海中国航海博物馆",
+   "上海博物馆",
+   "宁波中国港口博物馆"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 3.07
+ },
+ {
+  "kind": "馆级信息",
+  "q": "上海博物馆的开放时间是几点",
+  "expect": [
+   "上海博物馆"
+  ],
+  "kw_sources": [
+   "上海中国航海博物馆",
+   "上海博物馆",
+   "上海大学博物馆"
+  ],
+  "kw_top": false,
+  "kw_any": true,
+  "kw_time": 1.32,
+  "vec_sources": [
+   "上海博物馆",
+   "上海市历史博物馆（上海革命历史博物馆）",
+   "上海中国航海博物馆"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.67
+ },
+ {
+  "kind": "馆级信息",
+  "q": "上海大学博物馆的开放时间是几点",
+  "expect": [
+   "上海大学博物馆"
+  ],
+  "kw_sources": [
+   "上海大学博物馆",
+   "四川大学博物馆",
+   "山东大学博物馆"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 2.43,
+  "vec_sources": [
+   "上海大学博物馆",
+   "上海博物馆",
+   "上海市历史博物馆（上海革命历史博物馆）"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.3
+ },
+ {
+  "kind": "馆级信息",
+  "q": "上海市历史博物馆（上海革命历史博物馆）的开放时间是几点",
+  "expect": [
+   "上海市历史博物馆（上海革命历史博物馆）"
+  ],
+  "kw_sources": [
+   "上海市历史博物馆（上海革命历史博物馆）",
+   "陈云纪念馆（青浦革命历史纪念馆）",
+   "鄂尔多斯市博物院"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.4,
+  "vec_sources": [
+   "上海市历史博物馆（上海革命历史博物馆）",
+   "上海博物馆",
+   "上海中国航海博物馆"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.46
+ },
+ {
+  "kind": "馆级信息",
+  "q": "上海市奉贤区博物馆的开放时间是几点",
+  "expect": [
+   "上海市奉贤区博物馆"
+  ],
+  "kw_sources": [
+   "上海市奉贤区博物馆",
+   "宝硕流光",
+   "清代尤士芬《山水人物》四条屏修复案例"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.28,
+  "vec_sources": [
+   "上海市奉贤区博物馆",
+   "上海博物馆",
+   "上海市历史博物馆（上海革命历史博物馆）"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.8
+ },
+ {
+  "kind": "馆级信息",
+  "q": "上海市龙华烈士纪念馆的开放时间是几点",
+  "expect": [
+   "上海市龙华烈士纪念馆"
+  ],
+  "kw_sources": [
+   "上海市龙华烈士纪念馆",
+   "淮海战役纪念馆",
+   "雨花台烈士纪念馆"
+  ],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.55,
+  "vec_sources": [
+   "上海市龙华烈士纪念馆",
+   "雨花台烈士纪念馆",
+   "侵华日军南京大屠杀遇难同胞纪念馆"
+  ],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.29
+ },
+ {
+  "kind": "无关/闲聊",
+  "q": "附近有什么好吃的",
+  "expect": [],
+  "kw_sources": [],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.07,
+  "vec_sources": [],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.34
+ },
+ {
+  "kind": "无关/闲聊",
+  "q": "今天天气怎么样",
+  "expect": [],
+  "kw_sources": [
+   "晚清最大私家收藏恭亲王府珍宝散佚记",
+   "战国带钩",
+   "文化和旅游部恭王府博物馆"
+  ],
+  "kw_top": false,
+  "kw_any": false,
+  "kw_time": 1.34,
+  "vec_sources": [],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.37
+ },
+ {
+  "kind": "无关/闲聊",
+  "q": "帮我写一首关于春天的诗",
+  "expect": [],
+  "kw_sources": [
+   "淮北市博物馆"
+  ],
+  "kw_top": false,
+  "kw_any": false,
+  "kw_time": 1.75,
+  "vec_sources": [],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.56
+ },
+ {
+  "kind": "无关/闲聊",
+  "q": "推荐一部最近好看的电影",
+  "expect": [],
+  "kw_sources": [],
+  "kw_top": true,
+  "kw_any": true,
+  "kw_time": 1.56,
+  "vec_sources": [],
+  "vec_top": true,
+  "vec_any": true,
+  "vec_time": 1.29
+ }
+]

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 用户气泡：蓝色 -->
+<!-- 用户气泡：浅蓝底（DeepSeek 风格），深色文字 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="@color/ds_blue" />
-    <corners android:radius="18dp" />
+    <solid android:color="#E8EFFF" />
+    <corners android:radius="20dp" />
 </shape>

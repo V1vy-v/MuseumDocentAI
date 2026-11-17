@@ -1,6 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- 来源小胶囊的底：比气泡更淡的一层 -->
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- 来源小标签：浅灰蓝底 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#F1EDF9" />
+    <solid android:color="#F2F4FF" />
     <corners android:radius="8dp" />
 </shape>

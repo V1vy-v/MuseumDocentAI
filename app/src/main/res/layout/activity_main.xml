@@ -190,7 +190,7 @@
             android:paddingTop="10dp"
             android:paddingEnd="10dp"
             android:paddingBottom="8dp"
-            app:layout_constraintBottom_toBottomOf="parent">
+            app:layout_constraintBottom_toTopOf="@id/text_footer">
 
             <EditText
                 android:id="@+id/edit_question"
@@ -229,6 +229,19 @@
                     tools:ignore="SpeakableTextPresentCheck" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- 底部免责提示（DeepSeek 同款） -->
+        <TextView
+            android:id="@+id/text_footer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingTop="2dp"
+            android:paddingBottom="10dp"
+            android:text="@string/ai_disclaimer"
+            android:textColor="@color/ds_gray"
+            android:textSize="11sp"
+            app:layout_constraintBottom_toBottomOf="parent" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- 抽屉打开时的半透明遮罩 -->

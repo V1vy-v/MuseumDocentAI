@@ -33,14 +33,6 @@
             android:textColor="@color/text_on_brand"
             android:textSize="18sp"
             android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:alpha="0.85"
-            android:text="@string/browse_subtitle"
-            android:textColor="@color/text_on_brand"
-            android:textSize="11sp" />
     </LinearLayout>
 
     <!-- 搜索区 -->

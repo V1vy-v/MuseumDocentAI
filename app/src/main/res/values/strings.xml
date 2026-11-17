@@ -62,6 +62,7 @@
     <!-- ====== 历史会话 ====== -->
     <string name="btn_history">历史</string>
     <string name="history_title">历史对话</string>
+    <string name="history_hint">点击可恢复之前的对话</string>
     <string name="history_empty">还没有历史对话</string>
-    <string name="btn_new_session">新对话</string>
+    <string name="btn_new_session">＋ 新对话</string>
 </resources>

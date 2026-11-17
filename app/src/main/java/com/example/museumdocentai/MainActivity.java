@@ -1,10 +1,16 @@
 package com.example.museumdocentai;
 
 import android.Manifest;
-import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -14,11 +20,14 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.museumdocentai.model.SessionInfo;
 import com.example.museumdocentai.net.ApiClient;
 import com.example.museumdocentai.net.ChatApi;
 import com.example.museumdocentai.ui.ChatUiManager;
+import com.example.museumdocentai.ui.HistoryAdapter;
 
 import java.util.List;
 import java.util.UUID;
@@ -72,33 +81,13 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.btn_history).setOnClickListener(v -> showHistoryDialog());
     }
 
-    /** 历史对话弹窗：第一项是"新对话"，其余是后端存过的会话 */
+    /** 历史对话弹窗：标题 + 会话列表 + 底部"新对话" */
     private void showHistoryDialog() {
         ApiClient api = new ApiClient(this);
         api.listSessions(30, new ChatApi.SessionListCallback() {
             @Override
             public void onList(List<SessionInfo> sessions) {
-                int count = sessions.size();
-                String[] items = new String[count + 1];
-                items[0] = getString(R.string.btn_new_session);
-                for (int i = 0; i < count; i++) {
-                    SessionInfo info = sessions.get(i);
-                    String title = info.title.isEmpty() ? getString(R.string.history_empty) : info.title;
-                    items[i + 1] = title + "\n" + info.metaLine();
-                }
-                new AlertDialog.Builder(MainActivity.this)
-                        .setTitle(R.string.history_title)
-                        .setItems(items, (dialog, which) -> {
-                            if (which == 0) {
-                                sessionId = UUID.randomUUID().toString();
-                                uiManager.startNewSession(sessionId);
-                            } else {
-                                sessionId = sessions.get(which - 1).sessionId;
-                                uiManager.loadHistorySession(sessionId);
-                            }
-                        })
-                        .setNegativeButton(R.string.dialog_cancel, null)
-                        .show();
+                showSessionList(sessions);
             }
 
             @Override
@@ -106,6 +95,44 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void showSessionList(List<SessionInfo> sessions) {
+        final Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        View view = getLayoutInflater().inflate(R.layout.dialog_history, null);
+        RecyclerView recycler = view.findViewById(R.id.recycler_history);
+        TextView empty = view.findViewById(R.id.text_history_empty);
+
+        recycler.setLayoutManager(new LinearLayoutManager(this));
+        HistoryAdapter adapter = new HistoryAdapter(info -> {
+            dialog.dismiss();
+            sessionId = info.sessionId;
+            uiManager.loadHistorySession(sessionId);
+        });
+        recycler.setAdapter(adapter);
+        adapter.submit(sessions);
+
+        boolean noData = sessions.isEmpty();
+        empty.setVisibility(noData ? View.VISIBLE : View.GONE);
+        recycler.setVisibility(noData ? View.GONE : View.VISIBLE);
+
+        view.findViewById(R.id.btn_new_session).setOnClickListener(v -> {
+            dialog.dismiss();
+            sessionId = UUID.randomUUID().toString();
+            uiManager.startNewSession(sessionId);
+        });
+
+        dialog.setContentView(view);
+        dialog.show();
+        // 圆角卡片要透明底，宽度占屏 92%
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.92f);
+            window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
     }
 
     /** 点麦克风按钮：有录音权限就直接录，没有就先申请 */

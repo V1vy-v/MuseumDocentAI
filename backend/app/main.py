@@ -67,7 +67,7 @@ async def flatten_http_error(request: Request, exc: StarletteHTTPException):
     背景：FastAPI 的 HTTPException(detail={...}) 会自动再包一层 detail，
     实际返回 {"detail": {"error": "...", "hint": "..."}}；
     但前端 ApiClient.handleResponse 是按平铺解析的（json.has("error")），
-    schemas/chat.py 的 ErrorResponse 也声明成平铺——三方不一致，错的是后端。
+    前端那边的 ErrorResponse 也声明成平铺——两方不一致，错的是后端。
 
     不摊平的后果：模型调用失败返回 502 时，前端判定为"成功但 answer 为空"，
     界面上出现一个空气泡，而不是"AI 服务暂时不可用，请稍后再试"。

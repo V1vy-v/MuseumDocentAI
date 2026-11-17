@@ -168,12 +168,6 @@ class TokenWindowTest(TempDBTestCase):
         self.assertEqual(ctx["summary"], "")
         self.assertEqual(ctx["recent_sources"], [])
 
-    def test_recall_backward_compatible(self):
-        """chat.py / voice.py 依赖 recall 的返回格式，不能变"""
-        self._seed_turns(3, tokens=10)
-        recalled = memory.recall(self.sid)
-        self.assertEqual(set(recalled[0].keys()), {"role", "content"})
-
     def test_history_items_have_no_extra_keys(self):
         """history 会原样拼进模型的 messages 数组，多带字段可能被接口拒绝"""
         self._seed_turns(2, tokens=10)

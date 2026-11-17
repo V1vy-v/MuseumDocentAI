@@ -38,11 +38,6 @@ def remember(session_id: str, role: str, content: str,
 
 # ======== 读取 ========
 
-def recall(session_id: str) -> list:
-    """取该会话的对话历史（给模型看的上文），返回 [{"role","content"}]"""
-    return [{"role": m["role"], "content": m["content"]} for m in _window(session_id)]
-
-
 def get_context(session_id: str) -> dict:
     """一次取回模型和指代消解需要的全部上文。
 

@@ -36,12 +36,6 @@ class VoiceResponse(BaseModel):
     sources_detail: list[SourceItem] = []
 
 
-class ErrorResponse(BaseModel):
-    """统一错误格式"""
-    error: str                       # 错误说明（给开发看）
-    hint: str                        # 给用户看的友好提示
-
-
 class TtsRequest(BaseModel):
     """语音合成请求"""
     text: str                        # 要朗读的文本

@@ -11,7 +11,8 @@ zvec
 # —— 语音 ——
 # 不需要另装：ASR 和 TTS 都走 DeepSeek 的工具接口
 #   /v1/tools/asr（语音识别，multipart 上传）  /v1/tools/tts（语音合成，返回 WAV）
-# 向量化也不需要本地模型：走火山 Ark 的 doubao-embedding-vision（见 core/config.py）
+# 向量化也不需要本地模型：走远端 OpenAI 兼容的 /embeddings，
+# 默认火山 Ark 的 doubao-embedding-vision，可用 EMBED_* 换成别家（见 core/config.py）
 
 # —— 测试 ——
 # 不需要另装：单元测试用标准库 unittest（见 tests/），零依赖即可运行

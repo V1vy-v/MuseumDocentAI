@@ -4,8 +4,8 @@
 #   .venv\Scripts\python.exe -m unittest discover -s tests -t .
 #
 # 这个格式是跨端契约：前端 ApiClient.handleResponse 用 json.has("error") 判断出错，
-# schemas/chat.py 的 ErrorResponse 也声明成平铺。而 FastAPI 的
-# HTTPException(detail={...}) 默认会包一层 detail，导致三者不一致——
+# 前端的 ErrorResponse 也声明成平铺。而 FastAPI 的
+# HTTPException(detail={...}) 默认会包一层 detail，导致两边不一致——
 # 模型调用失败时前端会显示空气泡而不是友好提示。main.py 里的异常处理器负责摊平。
 
 import asyncio

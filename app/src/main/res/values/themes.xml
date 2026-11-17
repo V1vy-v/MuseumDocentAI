@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Base.Theme.MuseumDocentAI" parent="Theme.Material3.DayNight.NoActionBar">
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- 固定浅色：界面配色是写死的白底深字（DeepSeek 风格），
+         如果用 DayNight，系统深色模式下对话框会变成深底，
+         而我们文案仍是深字 —— 就成了"深底深字看不清"（实测踩过）。 -->
+    <style name="Base.Theme.MuseumDocentAI" parent="Theme.Material3.Light.NoActionBar">
         <item name="colorPrimary">@color/brand</item>
         <item name="colorOnPrimary">@color/text_on_brand</item>
         <item name="colorPrimaryContainer">@color/brand_light</item>
@@ -10,6 +13,12 @@
         <item name="android:colorBackground">@color/bg_app</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
+        <!-- 关掉系统强制反色，保证白底不被自动压暗（API 29+ 才有，低版本自动忽略） -->
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+        <item name="isLightTheme">true</item>
+        <!-- 对话框统一白底，避免不同 ROM 的主题差异 -->
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/ds_text</item>
     </style>
 
     <style name="Theme.MuseumDocentAI" parent="Base.Theme.MuseumDocentAI" />

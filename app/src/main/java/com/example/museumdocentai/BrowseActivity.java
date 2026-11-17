@@ -391,10 +391,22 @@ public class BrowseActivity extends AppCompatActivity {
                     });
                 }
 
-                new AlertDialog.Builder(BrowseActivity.this)
+                AlertDialog dialog = new AlertDialog.Builder(BrowseActivity.this)
                         .setView(view)
                         .setPositiveButton(R.string.browse_close, null)
-                        .show();
+                        .create();
+                dialog.show();
+                // 弹窗整体固定白底：深色模式下主题会把窗口底色压暗，
+                // 正文是白卡片、按钮条却是黑的，看着像两种风格拼在一起
+                if (dialog.getWindow() != null) {
+                    dialog.getWindow().setBackgroundDrawable(
+                            getDrawable(R.drawable.bg_card));
+                    dialog.getWindow().setDimAmount(0.35f);
+                }
+                android.widget.Button ok = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                if (ok != null) {
+                    ok.setTextColor(getColor(R.color.ds_blue));
+                }
             }
 
             @Override

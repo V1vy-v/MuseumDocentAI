@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 资料原文弹窗：圆角卡片，正文可滚动、可选中复制 -->
+<!-- 资料原文弹窗：圆角卡片，正文可滚动、可选中复制。
+     白底是显式指定的：系统深色模式下主题会把对话框变暗，
+     而正文颜色是写死的深色，靠主题就会变成"深底深字"看不清。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@color/surface"
     android:orientation="vertical"
     android:paddingStart="20dp"
     android:paddingTop="18dp"

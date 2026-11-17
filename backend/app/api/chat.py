@@ -2,6 +2,8 @@
 #
 # POST /api/chat         非流式：{ question, session_id } → { answer, sources }
 # POST /api/chat/stream  流式（SSE）：事件 meta → delta* → done（或 error）
+#                        可选 with_audio=true：额外推 audio* → audio_done，
+#                        服务端边生成边按句合成，文字不必等语音
 #
 # 处理流程（顺序很关键，两个接口共用同一份）：
 #   0. 旧对话累积够了就先压缩成摘要（跨阈值时才真的调模型，多数请求什么都不做）
@@ -16,13 +18,14 @@
 #   万一流式那条路出问题就没了退路。新增一条路径，前端接不接、什么时候接都行，
 #   旧版本 APP 永远能用。
 
+import base64
 import json
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from ..schemas.chat import ChatRequest, ChatResponse
-from ..services import coreference, llm_client, memory, rag
+from ..services import coreference, llm_client, memory, rag, speech, tts_client
 
 router = APIRouter()
 
@@ -92,22 +95,45 @@ def _sse(name: str, payload: dict) -> str:
     return f"event: {name}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
+def _audio_sse(index: int, data: bytes) -> str:
+    """一句音频的 SSE 事件（WAV 字节转 base64）。"""
+    return _sse("audio", {"index": index, "format": "wav",
+                          "audio_base64": base64.b64encode(data).decode()})
+
+
 def chat_stream_events(req: ChatRequest):
     """SSE 事件生成器。
 
     抽成独立函数（而不是藏在路由里）是为了能直接单测——不必起服务，
     直接消费这个生成器就能验证事件序列、出错行为、以及"中途断开"的处理。
 
-    事件：
+    事件（默认路径，和以前一致）：
         meta  {session_id, sources, resolved}  先给来源与消解结果，界面可提前显示
         delta {text}                           文本增量
-        done  {answer, usage}                  正常结束
+        done  {answer, usage}                  文字回答结束
         error {error, hint}                    中途出错（响应头已发出，改不了状态码）
+
+    另外两个事件只在 with_audio=True 时出现：
+        audio {index, format, audio_base64}    一句话的音频，按 index 升序播放
+        audio_done {count, error}              语音已经全部推完
+
+    with_audio 的事件顺序是：
+        meta → (delta | audio)* → done → audio* → audio_done
+
+    注意 done 在音频之前：文字一完整就通知客户端（把输入框放开），
+    音频继续在后面推。所以客户端收到 done 后要继续读，直到 audio_done 或流结束。
+
+    为什么要服务端做这件事：TTS 耗时约 0.7s + 35ms/字，如果等整段回答再合成，
+    观众要多等 5 秒以上。按句合成后，第一句出来就能播，实测合成速度约是
+    播放速度的 4 倍，后面的句子在播放期间一定合成得完，不会断档。
     """
     buf = []
     usage = {}
     resolved = req.question      # 必须在 try 之前初始化：finally 里要用
     titles = []
+    speaker = None
+    audio_count = 0
+    audio_skip = ""
     try:
         ctx, resolved, sources, titles, catalog = _prepare(req)
         yield _sse("meta", {"session_id": req.session_id,
@@ -124,15 +150,44 @@ def chat_stream_events(req: ChatRequest):
                             ],
                             "resolved": resolved})
 
+        # 语音流水线只在客户端明确要、且真的配了 TTS 时启动。
+        # 没配置也不能让整条问答失败——文字照常给，最后用 audio_done 说明原因。
+        if req.with_audio:
+            if tts_client.available():
+                speaker = speech.SentenceSpeaker()
+                speaker.start()
+            else:
+                audio_skip = "未配置 TTS 服务"
+
         for kind, payload in llm_client.stream_reply(
                 req.question, ctx["history"], sources, ctx["summary"], catalog):
             if kind == "delta":
                 buf.append(payload)
                 yield _sse("delta", {"text": payload})
+                if speaker:
+                    speaker.feed(payload)
+                    # 不阻塞：只有已经合成好的才立即推出去
+                    for item in speaker.poll():
+                        audio_count += 1
+                        yield _audio_sse(*item)
             else:
                 usage = payload
 
         yield _sse("done", {"answer": "".join(buf), "usage": usage})
+
+        if speaker:
+            speaker.flush()
+            speaker.close()
+            while True:
+                items = speaker.poll(0.5)
+                for item in items:
+                    audio_count += 1
+                    yield _audio_sse(*item)
+                if speaker.finished() and not items:
+                    break
+            yield _sse("audio_done", {"count": audio_count, "error": speaker.error})
+        elif req.with_audio:
+            yield _sse("audio_done", {"count": 0, "error": audio_skip})
     except Exception as exc:                                     # noqa: BLE001
         # 首块一旦发出，状态码就定了，错误只能作为事件报给前端
         yield _sse("error", {"error": str(exc), "hint": "AI 服务暂时不可用，请稍后再试"})
@@ -140,6 +195,8 @@ def chat_stream_events(req: ChatRequest):
         # 客户端中途断开时，这里会被抛 GeneratorExit——所以【绝对不能 yield】。
         # 在 finally 里 yield 会触发 RuntimeError: generator ignored GeneratorExit。
         # 但落库必须做：否则中途退出的一轮就丢了，下一轮问"它是什么"会断片。
+        if speaker is not None:
+            speaker.stop()          # 别让后台合成线程在断连后继续跑
         _save(req.session_id, req.question, "".join(buf), resolved, titles)
         memory.record_usage(req.session_id, usage)
 
@@ -150,6 +207,9 @@ def chat_stream(req: ChatRequest):
 
     实测收益（2026-10）：首字 1.85~3.03s，而整段要 24~30s——
     感知延迟降约 10 倍，总时长不变。
+
+    req.with_audio=True 时，服务端会在生成过程中按句合成语音，
+    事件流里插入 audio / audio_done（见 chat_stream_events 的说明）。
     """
     return StreamingResponse(
         chat_stream_events(req),

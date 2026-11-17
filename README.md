@@ -35,6 +35,13 @@ MuseumDocentAI/
 │   ├── requirements.txt                 后端依赖清单
 │   └── README.md                        后端运行说明
 │
+├── web/                                ★ Web 前端：Vue 3 + Vite（左栏对话历史 + 中间流式问答）
+│   ├── src/components/                     侧栏历史、消息气泡、输入区、空状态
+│   ├── src/stores/chat.ts                  会话与问答状态（新建/打开/删除/发送/语音）
+│   ├── src/api/                            接口封装 + SSE 流式解析
+│   ├── vite.config.ts                      dev 端口与 /api 反向代理
+│   └── README.md                           前端启动说明
+│
 ├── docs/                               文档：技术方案、测试记录、报告素材
 └── README.md                           本文件：项目总览
 ```
@@ -60,6 +67,18 @@ cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+**Web 前端（Vue，浏览器版问答页）**：需要 Node 18 以上（本项目用 Node 24 验证）。
+
+```bash
+cd web
+npm install          # 已配国内镜像（web/.npmrc），约 7 秒
+npm run dev          # → http://127.0.0.1:5173
+```
+
+后端要同时跑着。前端的 `/api/*` 由 Vite 代理转发到 `http://127.0.0.1:8000`，
+浏览器里前后端同源，**不需要改后端、也不需要配 CORS**。
+手机同局域网演示用 `npm run dev:lan`，细节见 `web/README.md`。
 
 **APP 使用说明（角色 A、B）**：
 

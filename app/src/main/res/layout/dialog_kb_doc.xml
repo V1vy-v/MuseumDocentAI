@@ -31,6 +31,17 @@
         android:textColor="@color/brand_dark"
         android:textSize="11sp" />
 
+    <ImageView
+        android:id="@+id/image_doc"
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:layout_marginBottom="10dp"
+        android:adjustViewBounds="true"
+        android:background="@color/brand_light"
+        android:contentDescription="@string/doc_image_desc"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"

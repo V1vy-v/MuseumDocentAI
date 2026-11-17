@@ -1,6 +1,8 @@
 package com.example.museumdocentai.net;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
@@ -16,6 +18,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -254,6 +257,17 @@ public class ApiClient implements ChatApi {
                 final String category = json.optString("category", "");
                 final String text = json.optString("text", "");
 
+                List<String> images = new ArrayList<>();
+                JSONArray imgArray = json.optJSONArray("images");
+                if (imgArray != null) {
+                    for (int i = 0; i < imgArray.length(); i++) {
+                        String one = imgArray.optString(i, "");
+                        if (!one.isEmpty()) {
+                            images.add(one);
+                        }
+                    }
+                }
+
                 StringBuilder meta = new StringBuilder("artifact".equals(kind) ? "文物" : "博物馆");
                 if (!province.isEmpty()) {
                     meta.append(" · ").append(province);
@@ -265,13 +279,58 @@ public class ApiClient implements ChatApi {
                     meta.append(" · ").append(category);
                 }
                 final String metaLine = meta.toString();
-                mainHandler.post(() -> callback.onDoc(title, metaLine, text));
+                final List<String> finalImages = images;
+                mainHandler.post(() -> callback.onDoc(title, metaLine, text, finalImages));
             } catch (IOException e) {
                 mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_network)));
             } catch (JSONException e) {
                 mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_server)));
             }
         });
+    }
+
+    @Override
+    public void fetchImage(String path, ImageCallback callback) {
+        executor.execute(() -> {
+            for (String base : baseUrlsToTry()) {
+                try {
+                    byte[] data = getBytesOnce(base, "/api/kb/image?path=" + encode(path));
+                    final Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+                    if (bitmap != null) {
+                        workingBaseUrl = base;
+                        mainHandler.post(() -> callback.onImage(bitmap));
+                        return;
+                    }
+                } catch (IOException ignored) {
+                    // 换下一个地址重试
+                }
+            }
+            mainHandler.post(() -> callback.onFailure(context.getString(R.string.err_network)));
+        });
+    }
+
+    /** GET 二进制（图片用），连不上会换地址重试 */
+    private byte[] getBytesOnce(String baseUrl, String path) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + path).openConnection();
+        connection.setRequestMethod("GET");
+        connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        connection.setReadTimeout(READ_TIMEOUT_MS);
+        try {
+            if (connection.getResponseCode() >= 400) {
+                throw new IOException("HTTP " + connection.getResponseCode());
+            }
+            try (InputStream in = connection.getInputStream();
+                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, read);
+                }
+                return out.toByteArray();
+            }
+        } finally {
+            connection.disconnect();
+        }
     }
 
     // ======== 流式问答 + 会话历史 ========

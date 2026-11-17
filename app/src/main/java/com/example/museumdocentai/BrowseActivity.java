@@ -3,6 +3,7 @@ package com.example.museumdocentai;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -12,6 +13,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -365,12 +367,30 @@ public class BrowseActivity extends AppCompatActivity {
     private void openDoc(KbItem item) {
         api.openKbDoc(item.path, new ChatApi.KbDocCallback() {
             @Override
-            public void onDoc(String title, String meta, String text) {
+            public void onDoc(String title, String meta, String text, List<String> images) {
                 View view = getLayoutInflater().inflate(R.layout.dialog_kb_doc, null);
                 ((TextView) view.findViewById(R.id.text_dialog_title)).setText(title);
                 ((TextView) view.findViewById(R.id.text_dialog_meta)).setText(meta);
                 ((TextView) view.findViewById(R.id.text_dialog_body)).setText(
                         TextUtils.isEmpty(text) ? getString(R.string.browse_empty) : text);
+
+                // 实物照片：有就异步加载，没有就整块隐藏（不再把 ![](...) 当文字丢给用户）
+                final ImageView image = view.findViewById(R.id.image_doc);
+                if (images != null && !images.isEmpty()) {
+                    image.setVisibility(View.VISIBLE);
+                    api.fetchImage(images.get(0), new ChatApi.ImageCallback() {
+                        @Override
+                        public void onImage(Bitmap bitmap) {
+                            image.setImageBitmap(bitmap);
+                        }
+
+                        @Override
+                        public void onFailure(String message) {
+                            image.setVisibility(View.GONE);
+                        }
+                    });
+                }
+
                 new AlertDialog.Builder(BrowseActivity.this)
                         .setView(view)
                         .setPositiveButton(R.string.browse_close, null)

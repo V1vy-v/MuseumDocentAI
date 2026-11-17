@@ -82,10 +82,23 @@ public interface ChatApi {
 
     /** 打开一份资料原文的回调 */
     interface KbDocCallback {
-        void onDoc(String title, String meta, String text);
+        /**
+         * @param images 资料里引用的实物照片（相对知识库的路径），可能为空
+         */
+        void onDoc(String title, String meta, String text, List<String> images);
 
         void onFailure(String message);
     }
+
+    /** 加载图片的回调 */
+    interface ImageCallback {
+        void onImage(android.graphics.Bitmap bitmap);
+
+        void onFailure(String message);
+    }
+
+    /** 取一张资料图片（文物实物照片） */
+    void fetchImage(String path, ImageCallback callback);
 
     /**
      * 按关键词检索资料库。

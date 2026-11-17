@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from ..core import config
 
@@ -89,7 +89,7 @@ def _snippet(text: str, words: set, width: int = 90) -> str:
     而且博物馆卡正文第一行就是 "# 上海博物馆"，会截出"…"这种没用的结果。
     """
     body = [ln.strip() for ln in text.splitlines()
-            if ln.strip() and not ln.lstrip().startswith(("#", ">", "-", "·"))
+            if ln.strip() and not ln.lstrip().startswith(("#", ">", "-", "·", "!"))
             and "编号" not in ln and not ln.startswith("馆藏：")]
     plain = re.sub(r"[*>_`\[\]()!]", " ", " ".join(body))
     plain = re.sub(r"\s+", " ", plain).strip()
@@ -213,9 +213,63 @@ def kb_filters():
     return data["facets"]
 
 
+def _resolve_image(root: Path, base: Path, ref: str):
+    """把 md 里的图片引用解析成真实文件。
+
+    三种写法都要兼容：
+      assets/artifacts/...            （相对知识库根，我们整理的格式）
+      ../../assets/artifacts/...      （博物馆卡：相对 museums/<省>/）
+      ../../../assets/artifacts/...   （文物卡：相对 artifacts/<省>/<馆>/）
+    """
+    ref = ref.strip()
+    candidates = []
+    # 沿着这份资料所在目录往上找：md 里的相对路径可能相对馆目录、省目录、
+    # 也可能是相对整个语料库（assets/... 就是这种）。
+    current = base
+    while True:
+        candidates.append((current / ref).resolve())
+        if current == root or not current.is_relative_to(root) or current.parent == current:
+            break
+        current = current.parent
+    for candidate in candidates:
+        try:
+            if candidate.is_file() and candidate.is_relative_to(root):
+                return candidate
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def _to_plain(text: str) -> str:
+    """把 Markdown 转成给普通用户看的纯文本：标题加【】、去掉符号与内部字段。"""
+    lines = []
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        stripped = line.strip()
+        if not stripped:
+            lines.append("")
+            continue
+        if stripped.startswith("!["):
+            continue                                  # 图片单独走 images 字段
+        if "资料馆编号" in stripped or stripped.startswith("馆藏："):
+            continue                                  # 内部编号/馆藏前缀不展示
+        if stripped.startswith("### "):
+            lines.append(stripped[4:].strip())
+        elif stripped.startswith("## "):
+            lines.append("【" + stripped[3:].strip() + "】")
+        elif stripped.startswith("# "):
+            lines.append(stripped[2:].strip())
+        elif stripped.startswith("> "):
+            lines.append(stripped[2:].strip())
+        else:
+            # 列表项里的 **加粗** 去掉，保留“字段：值”
+            lines.append(stripped.replace("**", ""))
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip() + "\n"
+
+
 @router.get("/api/kb/doc")
 def kb_doc(path: str = Query(..., description="相对 knowledge_base 的路径")):
-    """取一份资料的纯文本，供 APP 直接渲染（不包 HTML）。"""
+    """取一份资料：干净正文 + 图片列表，供 APP 直接渲染（不包 HTML）。"""
     root = Path(config.KNOWLEDGE_BASE_DIR).resolve()
     target = (root / path).resolve()
     if not target.is_relative_to(root) or not target.is_file():
@@ -224,8 +278,29 @@ def kb_doc(path: str = Query(..., description="相对 knowledge_base 的路径")
 
     rel = target.relative_to(root)
     meta = _meta(rel)
+    raw = target.read_text(encoding="utf-8", errors="ignore")
+
+    images = []
+    # 只给文物卡配图：博物馆卡里的图片多为馆徽/公众号二维码，展示出来是噪音。
+    if meta["kind"] == "artifact":
+        for ref in re.findall(r"!\[[^\]]*\]\(([^)]+)\)", raw):
+            resolved = _resolve_image(root, target.parent, ref)
+            if resolved is not None:
+                images.append(resolved.relative_to(root).as_posix())
+
     return {"title": target.stem, "path": rel.as_posix(),
-            "text": target.read_text(encoding="utf-8", errors="ignore"), **meta}
+            "text": _to_plain(raw), "images": images, **meta}
+
+
+@router.get("/api/kb/image", include_in_schema=False)
+def kb_image(path: str = Query(..., description="相对 knowledge_base 的图片路径")):
+    """返回资料里引用的图片（文物实物照片）。"""
+    root = Path(config.KNOWLEDGE_BASE_DIR).resolve()
+    target = (root / path).resolve()
+    if not target.is_relative_to(root) or not target.is_file():
+        raise HTTPException(status_code=404,
+                            detail={"error": "image not found", "hint": path})
+    return FileResponse(target)
 
 
 # 通配路由放在最后：它会把 /api/kb/ 后面任何东西当文件路径，

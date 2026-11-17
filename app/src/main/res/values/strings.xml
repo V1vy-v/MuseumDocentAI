@@ -50,6 +50,7 @@
     <string name="browse_empty">没有找到相关资料，换个关键词试试</string>
     <string name="browse_count">共 %1$d 条</string>
     <string name="browse_close">关闭</string>
+    <string name="doc_image_desc">文物实物照片</string>
 
     <!-- ====== 空态引导 ====== -->
     <string name="avatar_ai">馆</string>

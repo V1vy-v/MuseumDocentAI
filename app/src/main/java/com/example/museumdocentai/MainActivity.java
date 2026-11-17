@@ -11,6 +11,7 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -114,6 +115,8 @@ public class MainActivity extends AppCompatActivity {
             uiManager.loadHistorySession(sessionId);
         });
         recycler.setAdapter(historyAdapter);
+
+        setupBackHandler();
     }
 
     // ================== 历史抽屉 ==================
@@ -204,6 +207,8 @@ public class MainActivity extends AppCompatActivity {
         closeDrawer();
         sessionId = UUID.randomUUID().toString();
         uiManager.startNewSession(sessionId);
+        // 界面本来就是空的时候，清空看不出变化，给个明确反馈
+        Toast.makeText(this, R.string.toast_new_chat, Toast.LENGTH_SHORT).show();
     }
 
     /** 点麦克风按钮：有录音权限就直接录，没有就先申请 */
@@ -232,13 +237,19 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    public void onBackPressed() {
-        if (drawer.getVisibility() == View.VISIBLE) {
-            closeDrawer();
-            return;
-        }
-        super.onBackPressed();
+    /** 返回键：抽屉开着先关抽屉，否则交给系统 */
+    private void setupBackHandler() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (drawer.getVisibility() == View.VISIBLE) {
+                    closeDrawer();
+                    return;
+                }
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+            }
+        });
     }
 
     @Override

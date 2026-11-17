@@ -47,12 +47,30 @@
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
+            <!-- 语音播报 / 资料库：按用户要求放到右上角 -->
+            <Button
+                android:id="@+id/btn_voice"
+                style="@style/DsPillButton"
+                android:layout_marginEnd="6dp"
+                android:contentDescription="@string/pill_voice_on"
+                android:text="@string/pill_voice_on"
+                tools:ignore="SpeakableTextPresentCheck" />
+
+            <Button
+                android:id="@+id/btn_browse"
+                style="@style/DsPillButton"
+                android:layout_marginEnd="4dp"
+                android:contentDescription="@string/pill_browse"
+                android:text="@string/pill_browse"
+                tools:ignore="SpeakableTextPresentCheck" />
+
             <Button
                 android:id="@+id/btn_new_chat"
                 style="@style/ToolbarIconButton"
+                android:contentDescription="@string/icon_new_chat"
                 android:text="@string/icon_new_chat"
                 android:textColor="@color/ds_text"
-                android:textSize="20sp"
+                android:textSize="18sp"
                 tools:ignore="SpeakableTextPresentCheck" />
         </LinearLayout>
 
@@ -192,24 +210,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:gravity="center_vertical"
+                android:gravity="end|center_vertical"
                 android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/btn_voice"
-                    style="@style/DsPillButton"
-                    android:layout_marginEnd="6dp"
-                    android:text="@string/pill_voice_on" />
-
-                <Button
-                    android:id="@+id/btn_browse"
-                    style="@style/DsPillButton"
-                    android:text="@string/pill_browse" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1" />
 
                 <Button
                     android:id="@+id/btn_mic"

@@ -1,0 +1,39 @@
+# 后端依赖锁定清单（2026-11-23 从实际运行通过的虚拟环境导出）
+#
+# 为什么要有这个文件：
+#   requirements.txt 只写了包名，没锁版本。新人今天装会拿到"当天最新"的版本，
+#   而本项目调好的环境是下面这一套 —— SDK 升级（尤其 fastapi/starlette）
+#   有概率改变 SSE 流式或 multipart 上传的行为，出问题很难查。
+#
+# 怎么用（推荐）：
+#   cd backend
+#   .venv\Scripts\python.exe -m pip install -r requirements-lock.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+#
+# ⚠️ 硬约束：zvec 目前只提供 cp314-cp314-win_amd64 的预编译轮子。
+#    也就是说后端需要 Windows x64 + CPython 3.14。
+#    换了 Python 小版本（3.12/3.13/3.15）会直接装不上 zvec。
+#
+# 升级依赖后请重新导出：
+#   .venv\Scripts\python.exe -m pip freeze | Sort-Object > requirements-lock.txt
+
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+certifi==2026.7.22
+charset-normalizer==3.5.2
+click==8.5.0
+fastapi==0.143.0
+h11==0.16.0
+idna==3.20
+numpy==2.5.5
+opentelemetry-api==1.45.1
+pydantic==2.14.0
+pydantic_core==2.50.0
+python-multipart==0.0.32
+requests==2.34.2
+starlette==1.7.0
+typing_extensions==4.16.0
+typing-inspection==0.4.4
+urllib3==2.8.0
+uvicorn==0.54.0
+zvec==0.8.1

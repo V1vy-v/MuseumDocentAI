@@ -19,8 +19,11 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import requests  # noqa: E402
 
 B = "http://127.0.0.1:8000"
-KB = Path(r"D:\Study\ComputerScience\Projects\AS\MuseumDocentAI\backend\knowledge_base\全国博物馆资料馆")
-OUT_JSON = Path(r"D:\Study\ComputerScience\Projects\AS\MuseumDocentAI\.tools\eval_data.json")
+
+# 路径都相对脚本自身推导，换机器/换目录都能跑（原来写死了开发机的绝对路径）
+_BACKEND = Path(__file__).resolve().parents[1]
+KB = _BACKEND / "knowledge_base" / "全国博物馆资料馆"
+OUT_JSON = _BACKEND / "data" / "eval_data.json"      # data/ 已在 .gitignore 里
 
 
 def sample_artifacts(n=20):
@@ -107,6 +110,7 @@ def main():
         print(f"{idx + 1:02d}/{len(cases)} {case['kind']:6s} {case['q'][:26]:28s} "
               f"关键词{'✓' if kw_top else '✗'} 向量{'✓' if vec_top else '✗'}")
 
+    OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
 
     def rate(key):

@@ -4,12 +4,28 @@
 
 ## 怎么跑起来
 
+最快的方式（换新电脑、组员机器都走这个）：
+
+```powershell
+cd backend
+scripts\setup_backend.cmd -CheckOnly    # 先体检：Python 版本 / 依赖 / .env / 索引
+scripts\setup_backend.cmd               # 一键建环境、装锁定依赖、按需建索引
+```
+
+会依次检查 Python 版本与位数、虚拟环境、依赖、`.env`、向量索引，缺什么补什么。
+
+手动做的话：
+
 ```bash
 cd backend
-pip install -r requirements.txt      # 含 zvec（向量库，win 包约 11MB）
-cp .env.example .env                 # 然后把两个密钥填进去
-uvicorn app.main:app --port 8000     # 开发时可以加 --reload
+py -3.14 -m venv .venv                                   # 必须 Python 3.14 + 64 位（zvec 只发布 cp314-win 轮子）
+.venv\Scripts\python.exe -m pip install -r requirements-lock.txt   # 锁定版本，别用 requirements.txt
+cp .env.example .env                                     # 填密钥，保存为 UTF-8
+.venv\Scripts\python.exe scripts\build_index.py          # 首次建索引，约 40 秒
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+换机、防火墙、手机连接、常见报错的完整清单见 **[docs/换机部署清单.md](../docs/换机部署清单.md)**。
 
 `.env` 里的两个密钥分工不同：
 
